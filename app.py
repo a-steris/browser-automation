@@ -125,4 +125,7 @@ def get_recent_customers():
         })
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run()
+
+# Vercel requires this
+app.debug = False
