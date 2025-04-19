@@ -22,10 +22,74 @@
     </nav>
 
     <div class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <!-- Test Mode Controls -->
+        <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-5 w-5 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M8.485 2.495c.673-1.167 2.357-1.167 3.03 0l6.28 10.875c.673 1.167-.17 2.625-1.516 2.625H3.72c-1.347 0-2.189-1.458-1.515-2.625L8.485 2.495zM10 5a.75.75 0 01.75.75v3.5a.75.75 0 01-1.5 0v-3.5A.75.75 0 0110 5zm0 9a1 1 0 100-2 1 1 0 000 2z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <div class="ml-3">
+                    <h3 class="text-sm font-medium text-yellow-800">Test Mode</h3>
+                    <div class="mt-2 text-sm text-yellow-700">
+                        <p>Create test data to see how the dashboard works.</p>
+                    </div>
+                    <div class="mt-4">
+                        <button id="createTestData" class="inline-flex rounded-md bg-yellow-50 px-2 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100">
+                            Create Test Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
         <!-- Balance -->
         <div class="bg-white shadow rounded-lg p-6 mb-6">
             <h2 class="text-xl font-semibold mb-4">Current Balance</h2>
             <div id="balance" class="text-2xl font-bold text-gray-900">Loading...</div>
+        </div>
+
+        <!-- Export Controls -->
+        <div class="bg-white shadow rounded-lg p-6 mb-6">
+            <div class="space-y-4">
+                <div class="flex justify-between items-center">
+                    <h2 class="text-xl font-semibold">Export Options</h2>
+                </div>
+                
+                <!-- Report Type Selection -->
+                <div class="flex items-center space-x-4">
+                    <label class="text-sm font-medium text-gray-700">Report Type:</label>
+                    <select id="reportType" class="mt-1 block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="payments">Payments Report</option>
+                        <option value="customers">Customers Report</option>
+                    </select>
+                    
+                    <label class="text-sm font-medium text-gray-700">Date Range:</label>
+                    <select id="dateRange" class="mt-1 block w-48 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                        <option value="7">Last 7 days</option>
+                        <option value="30" selected>Last 30 days</option>
+                        <option value="90">Last 90 days</option>
+                        <option value="365">Last year</option>
+                    </select>
+                </div>
+                
+                <!-- Export Actions -->
+                <div class="flex space-x-2">
+                    <button onclick="exportData('download')" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Download CSV
+                    </button>
+
+                    <button onclick="exportData('slack')" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-purple-600 hover:bg-purple-700">
+                        <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.526 2.526 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z"/>
+                        </svg>
+                        Send to Slack
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- Recent Payments -->
@@ -45,7 +109,180 @@
         </div>
     </div>
 
+    <!-- Email Modal -->
+    <div id="emailModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full">
+        <div class="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <h3 class="text-lg font-medium text-gray-900">Send Report via Email</h3>
+                <div class="mt-2">
+                    <input type="email" id="emailInput" placeholder="Enter email address" 
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                </div>
+                <div class="mt-4 flex justify-end space-x-2">
+                    <button onclick="hideEmailModal()" class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-800 text-sm font-medium rounded-md">
+                        Cancel
+                    </button>
+                    <button onclick="sendEmail()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-md">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Create test data
+        document.getElementById('createTestData').addEventListener('click', function() {
+            this.disabled = true;
+            this.textContent = 'Creating...';
+            
+            axios.post('/api/create-test-data')
+                .then(response => {
+                    if (response.data.success) {
+                        alert('Test data created successfully! Refreshing page...');
+                        window.location.reload();
+                    } else {
+                        alert('Error: ' + response.data.error);
+                    }
+                })
+                .catch(error => {
+                    alert('Error creating test data');
+                })
+                .finally(() => {
+                    this.disabled = false;
+                    this.textContent = 'Create Test Data';
+                });
+        });
+
+        function exportData(type) {
+            const reportType = document.getElementById('reportType').value;
+            const dateRange = document.getElementById('dateRange').value;
+            
+            const params = {
+                type: reportType,
+                notification: type,
+                date_range: parseInt(dateRange)
+            };
+            
+            if (type === 'download') {
+                // Show loading state
+                const button = event.target.closest('button');
+                const originalText = button.innerHTML;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Downloading...';
+                button.disabled = true;
+
+                axios.post('/api/export/csv', params, { 
+                    responseType: 'blob',
+                    headers: {
+                        'Accept': 'text/csv'
+                    }
+                })
+                .then(response => {
+                    const contentDisposition = response.headers['content-disposition'];
+                    let filename = 'stripe_report.csv';
+                    if (contentDisposition) {
+                        const match = contentDisposition.match(/filename=(.+\.csv)/i);
+                        if (match) filename = match[1];
+                    }
+
+                    // Create blob link to download
+                    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.setAttribute('download', filename);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.parentNode.removeChild(link);
+                    window.URL.revokeObjectURL(url);
+                    showNotification('Success', 'Report downloaded successfully', 'success');
+                })
+                .catch(error => {
+                    console.error('Download error:', error);
+                    showNotification('Error', 'Failed to download report', 'error');
+                })
+                .finally(() => {
+                    // Reset button state
+                    button.innerHTML = originalText;
+                    button.disabled = false;
+                });
+
+            } else if (type === 'slack') {
+                // Show loading state
+                const button = event.target.closest('button');
+                const originalText = button.innerHTML;
+                button.disabled = true;
+                button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Sending...';
+                
+                axios.post('/api/export/csv', params)
+                    .then(response => {
+                        if (response.data.success) {
+                            showNotification('Success', 'Report sent to Slack successfully!', 'success');
+                        } else {
+                            showNotification('Error', response.data.error, 'error');
+                        }
+                    })
+                    .catch(error => {
+                        showNotification('Error', 'Failed to send report to Slack', 'error');
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                    });
+            }
+        }
+
+        function showEmailModal() {
+            document.getElementById('emailModal').classList.remove('hidden');
+            // Pre-fill report type in modal
+            document.getElementById('emailReportType').value = document.getElementById('reportType').value;
+            document.getElementById('emailDateRange').value = document.getElementById('dateRange').value;
+        }
+        
+        function showNotification(title, message, type) {
+            const colors = {
+                success: 'bg-green-500',
+                error: 'bg-red-500',
+                info: 'bg-blue-500'
+            };
+            
+            const notification = document.createElement('div');
+            notification.className = `fixed top-4 right-4 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-500 translate-y-0 opacity-100`;
+            notification.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 ${type === 'success' ? 'text-green-400' : 'text-red-400'}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                ${type === 'success' 
+                                    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>'
+                                    : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>'
+                                }
+                            </svg>
+                        </div>
+                        <div class="ml-3 w-0 flex-1 pt-0.5">
+                            <p class="text-sm font-medium text-gray-900">${title}</p>
+                            <p class="mt-1 text-sm text-gray-500">${message}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex">
+                            <button onclick="this.closest('.fixed').remove()" class="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                <span class="sr-only">Close</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(notification);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                notification.classList.add('opacity-0', '-translate-y-4');
+                setTimeout(() => notification.remove(), 500);
+            }, 5000);
+        }
+
         // Fetch balance
         axios.get('/api/balance')
             .then(response => {
@@ -70,7 +307,12 @@
                                 <span class="font-medium">$${payment.amount.toFixed(2)} ${payment.currency.toUpperCase()}</span>
                                 <span class="text-gray-500">${new Date(payment.created).toLocaleString()}</span>
                             </div>
-                            <div class="text-sm text-gray-500">Status: ${payment.status}</div>
+                            <div class="text-sm text-gray-500">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${payment.status === 'succeeded' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                    ${payment.status}
+                                </span>
+                                ${payment.description ? `<span class="ml-2">${payment.description}</span>` : ''}
+                            </div>
                         </div>
                     `).join('');
                     document.getElementById('payments').innerHTML = paymentsHtml || 'No recent payments';
