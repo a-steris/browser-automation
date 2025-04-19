@@ -9,7 +9,7 @@ from utils import generate_report_csv, send_slack_message
 from functools import wraps
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)  # For session management
+app.secret_key = os.getenv('SECRET_KEY', os.urandom(24))  # For session management
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
@@ -268,7 +268,8 @@ def export_csv():
         })
 
 if __name__ == '__main__':
-    app.run()
+    port = int(os.getenv('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
 
 # Vercel requires this
 app.debug = False
