@@ -47,7 +47,7 @@ A modern web application that provides easy access to Stripe financial data, aut
    - View real-time balance
    - Monitor recent payments
    - Generate and export reports
-   - Send reports to Slack or email
+   - Send reports to Slack or email (for slack you have to connect a slack bot)
 
 ## Development
 
