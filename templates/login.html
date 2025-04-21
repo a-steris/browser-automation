@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Stripe Report Downloader</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen flex flex-col items-center justify-center">
+        <div class="max-w-md w-full bg-white/80 backdrop-blur-md rounded-3xl shadow-2xl p-12 border border-gray-200">
+
+            {% if error %}
+            <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+                {{ error }}
+            </div>
+            {% endif %}
+            <form method="POST" class="space-y-6">
+                <div>
+                    <input type="password" name="stripe_key" id="stripe_key" required placeholder="Enter your Stripe Secret Key (sk_test_...)"
+                           class="mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 text-gray-900 placeholder-gray-500">
+                </div>
+                <button type="submit"
+                        class="w-full flex justify-center py-3 px-6 border border-transparent rounded-lg shadow-lg text-base font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all duration-200 hover:shadow-xl transform hover:-translate-y-0.5">
+                    Continue
+                </button>
+            </form>
+        </div>
+    </div>
+    <script>
+        // Check for stored AWS credentials after login
+        document.addEventListener('DOMContentLoaded', function() {
+            const pendingAWSCredentials = localStorage.getItem('pendingAWSCredentials');
+            if (pendingAWSCredentials) {
+                // Clear stored credentials
+                localStorage.removeItem('pendingAWSCredentials');
+                
+                // Submit AWS credentials after successful login
+                fetch('{{ url_for("save_aws_credentials") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: pendingAWSCredentials
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.href = '/dashboard';
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
