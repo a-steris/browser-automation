@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "build:css": "tailwindcss -i ./static/src/main.css -o ./static/dist/main.css --watch"
+    "build": "tailwindcss -i ./static/src/main.css -o ./static/dist/main.css",
+    "dev": "tailwindcss -i ./static/src/main.css -o ./static/dist/main.css --watch"
   },
   "dependencies": {
     "tailwindcss": "^3.3.0"
