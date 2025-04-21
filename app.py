@@ -31,10 +31,32 @@ fernet = Fernet(ENCRYPTION_KEY)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')  # for session management
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
-app.config['SESSION_COOKIE_SECURE'] = False  # Allow HTTP for development
+
+# Set secure cookie settings based on environment
+is_production = os.getenv('FLASK_ENV') != 'development'
+app.config['SESSION_COOKIE_SECURE'] = is_production  # Use secure cookies in production
 app.config['SESSION_COOKIE_HTTPONLY'] = True  # Prevent JavaScript access to cookies
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 app.config['SESSION_COOKIE_NAME'] = 'asteris_session'  # Custom session cookie name
+
+# Configure Talisman security headers
+Talisman(app,
+    force_https=is_production,
+    strict_transport_security=is_production,
+    session_cookie_secure=is_production,
+    content_security_policy={
+        'default-src': [
+            "'self'",
+            "'unsafe-inline'",
+            "'unsafe-eval'",
+            "https://cdn.tailwindcss.com",
+            "https://unpkg.com",
+            "https://cdn.jsdelivr.net",
+            "https://api.stripe.com"
+        ],
+        'img-src': ["'self'", "data:", "https:"]
+    }
+)
 
 # Initialize Flask-Login
 # Initialize Flask-Login
@@ -50,45 +72,6 @@ def aws_config_required(f):
             return redirect(url_for('aws_config'))
         return f(*args, **kwargs)
     return decorated_function
-
-# Initialize Flask-Talisman (HTTPS & security headers)
-is_dev = os.getenv('FLASK_ENV', 'development') == 'development'
-
-Talisman(app, 
-    force_https=not is_dev,  # Don't force HTTPS in development
-    strict_transport_security=not is_dev,  # Don't set HSTS in development
-    session_cookie_secure=not is_dev,  # Allow non-HTTPS cookies in development
-    content_security_policy={
-        'default-src': "'self'",
-        'img-src': ["'self'", 'data:', 'https:', '*'],
-        'script-src': [
-            "'self'",
-            "'unsafe-inline'",
-            "'unsafe-eval'",  # Required for some development tools
-            'https://cdn.jsdelivr.net',
-            '*'
-        ],
-        'style-src': [
-            "'self'",
-            "'unsafe-inline'",
-            'https://cdn.jsdelivr.net',
-            '*'
-        ],
-        'connect-src': ["'self'", '*'],  # Allow API calls in development
-    } if is_dev else {
-        'default-src': "'self'",
-        'img-src': ["'self'", 'data:', 'https:'],
-        'script-src': [
-            "'self'",
-            'https://cdn.jsdelivr.net',
-        ],
-        'style-src': [
-            "'self'",
-            "'unsafe-inline'",  # Required for Tailwind
-            'https://cdn.jsdelivr.net',
-        ],
-    }
-)
 
 # Initialize Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')

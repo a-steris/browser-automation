@@ -79,7 +79,7 @@
                         <div class="bg-white shadow rounded-lg p-6">
                             <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
                             <div class="space-y-3">
-                                <button onclick="syncAndDownloadInvoices()" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                <button onclick="syncAndDownloadInvoices(event)" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
                                     <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M7 9a2 2 0 012-2h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9z" />
                                         <path d="M5 3a2 2 0 00-2 2v6a2 2 0 002 2V5h8a2 2 0 00-2-2H5z" />
@@ -308,78 +308,82 @@
             });
 
             function exportData(type, event) {
+                event.preventDefault();
                 const reportType = document.getElementById('reportType').value;
                 const dateRange = document.getElementById('dateRange').value;
+                const button = event.target.closest('button');
                 
-                const params = {
-                    type: reportType,
-                    notification: type,
-                    date_range: parseInt(dateRange)
-                };
+                if (!button) return;
+                
+                const originalText = button.innerHTML;
+                button.disabled = true;
                 
                 if (type === 'csv') {
-                    // Show loading state
-                    const button = event.target.closest('button');
-                    const originalText = button.innerHTML;
-                    button.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Downloading...';
-                    button.disabled = true;
-
-                    axios({
-                        method: 'get',
-                        url: `/api/export/csv?type=${reportType}&notification=download&date_range=${dateRange}`,
-                        responseType: 'blob'
+                    button.innerHTML = 'Downloading...';
+                    
+                    // Use fetch instead of axios for better blob handling
+                    fetch(`/api/export/csv?type=${reportType}&notification=download&date_range=${dateRange}`, {
+                        method: 'GET',
+                        headers: {
+                            'Accept': 'text/csv'
+                        }
                     })
                     .then(response => {
-                        const contentDisposition = response.headers['content-disposition'];
-                        let filename = 'stripe_report.csv';
-                        if (contentDisposition) {
-                            const match = contentDisposition.match(/filename=(.+\.csv)/i);
-                            if (match) filename = match[1];
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
                         }
-
-                        // Create blob link to download
-                        const url = window.URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }));
-                        const link = document.createElement('a');
-                        link.href = url;
-                        link.setAttribute('download', filename);
-                        document.body.appendChild(link);
-                        link.click();
-                        link.parentNode.removeChild(link);
+                        return response.blob();
+                    })
+                    .then(blob => {
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        a.download = `stripe_report_${new Date().toISOString().split('T')[0]}.csv`;
+                        document.body.appendChild(a);
+                        a.click();
                         window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
                         showNotification('Success', 'Report downloaded successfully', 'success');
                     })
                     .catch(error => {
                         console.error('Download error:', error);
-                        showNotification('Error', 'Failed to download report', 'error');
+                        showNotification('Error', 'Failed to download report. Please try again.', 'error');
                     })
                     .finally(() => {
-                        // Reset button state
-                        button.innerHTML = originalText;
                         button.disabled = false;
+                        button.innerHTML = originalText;
                     });
-
                 } else if (type === 'slack') {
-                    // Show loading state
-                    const button = event.target.closest('button');
-                    const originalText = button.innerHTML;
-                    button.disabled = true;
-                    button.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Sending...';
-                
-                    axios.post('/api/export/csv', params)
-                        .then(response => {
-                            if (response.data.success) {
-                                showNotification('Success', 'Report sent to Slack successfully!', 'success');
-                            } else {
-                                showNotification('Error', response.data.error, 'error');
-                            }
+                    button.innerHTML = 'Sending...';
+                    
+                    fetch('/api/export/csv', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            type: reportType,
+                            notification: type,
+                            date_range: parseInt(dateRange)
                         })
-                        .catch(error => {
-                            showNotification('Error', 'Failed to send report to Slack', 'error');
-                        })
-                        .finally(() => {
-                            button.disabled = false;
-                            button.innerHTML = originalText;
-                        });
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            showNotification('Success', 'Report sent to Slack successfully!', 'success');
+                        } else {
+                            throw new Error(data.error || 'Failed to send to Slack');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Slack error:', error);
+                        showNotification('Error', error.message || 'Failed to send report to Slack', 'error');
+                    })
+                    .finally(() => {
+                        button.disabled = false;
+                        button.innerHTML = originalText;
+                    });
                 }
             }
 
@@ -545,30 +549,37 @@
             }
 
             // Function to sync and download invoices
-            function syncAndDownloadInvoices() {
+            function syncAndDownloadInvoices(event) {
+                event.preventDefault();
                 const button = event.target.closest('button');
+                if (!button) return;
+                
                 button.disabled = true;
+                const originalText = button.innerHTML;
+                button.innerHTML = 'Syncing...';
 
                 fetch('/api/invoices/sync-and-download', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
-                    }
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/csv'
+                    },
+                    credentials: 'same-origin'
                 })
                 .then(response => {
-                    if (response.ok) {
-                        return response.blob();
+                    if (!response.ok) {
+                        return response.json().then(data => {
+                            throw new Error(data.error || 'Failed to sync invoices');
+                        });
                     }
-                    return response.json().then(data => {
-                        throw new Error(data.error || 'Failed to sync invoices');
-                    });
+                    return response.blob();
                 })
                 .then(blob => {
-                    // Create and click a temporary download link
                     const url = window.URL.createObjectURL(blob);
                     const a = document.createElement('a');
+                    a.style.display = 'none';
                     a.href = url;
-                    a.download = `stripe_invoices_${new Date().toISOString().slice(0,10)}.csv`;
+                    a.download = `stripe_invoices_${new Date().toISOString().split('T')[0]}.csv`;
                     document.body.appendChild(a);
                     a.click();
                     window.URL.revokeObjectURL(url);
@@ -576,10 +587,12 @@
                     showNotification('Success', 'Invoices downloaded successfully', 'success');
                 })
                 .catch(error => {
-                    showNotification('Error', error.message, 'error');
+                    console.error('Sync error:', error);
+                    showNotification('Error', error.message || 'Failed to sync invoices', 'error');
                 })
                 .finally(() => {
                     button.disabled = false;
+                    button.innerHTML = originalText;
                 });
             }
 
