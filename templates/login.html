@@ -27,5 +27,29 @@
             </form>
         </div>
     </div>
+    <script>
+        // Check for stored AWS credentials after login
+        document.addEventListener('DOMContentLoaded', function() {
+            const pendingAWSCredentials = localStorage.getItem('pendingAWSCredentials');
+            if (pendingAWSCredentials) {
+                // Clear stored credentials
+                localStorage.removeItem('pendingAWSCredentials');
+                
+                // Submit AWS credentials after successful login
+                fetch('{{ url_for("save_aws_credentials") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: pendingAWSCredentials
+                }).then(response => {
+                    if (response.ok) {
+                        window.location.href = '/dashboard';
+                    }
+                });
+            }
+        });
+    </script>
 </body>
 </html>

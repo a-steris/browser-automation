@@ -1,6 +1,6 @@
-# Stripe Report Downloader
+# Asteris
 
-A modern web application that provides easy access to Stripe financial data, automated reporting, and seamless export options. Built with Flask and styled with Tailwind CSS.
+A modern platform for managing and optimizing cloud costs across Stripe and AWS. Built with Flask and styled with Tailwind CSS.
 
 ## Features
 
@@ -8,8 +8,19 @@ A modern web application that provides easy access to Stripe financial data, aut
 - 📥 Export payment and customer reports as CSV
 - 🔄 Multiple export options (Download, Email, Slack)
 - 📱 Responsive design for desktop and mobile
-- 🔒 Secure authentication using Stripe API keys
+- 🔒 Enterprise-grade security features
 - 🧪 Test mode support for safe experimentation
+
+## Security Features
+
+- 🔐 End-to-end encryption for all sensitive data
+- 🛡️ HTTPS/SSL encryption for all communications
+- 🔒 Secure session management with HTTP-only cookies
+- 🚫 Protection against XSS and CSRF attacks
+- 🔑 Encrypted storage of API keys
+- 📝 No persistent storage of sensitive data
+- 🌐 Content Security Policy (CSP) implementation
+- ⚡ Strict Transport Security (HSTS) enabled
 
 ## Setup
 
@@ -21,6 +32,28 @@ A modern web application that provides easy access to Stripe financial data, aut
 2. Create a `.env` file with your configuration:
    ```bash
    cp .env.example .env
+   ```
+
+3. Generate secure keys for encryption and session management:
+   ```bash
+   # Generate a secure encryption key
+   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+   
+   # Generate a secure session key
+   python -c "import os; print(os.urandom(24).hex())"
+   ```
+
+4. Configure your `.env` file with the generated keys:
+   ```env
+   # Required for encryption of sensitive data
+   ENCRYPTION_KEY=your_generated_encryption_key
+   
+   # Required for secure session management
+   SECRET_KEY=your_generated_session_key
+   
+   # Your API keys (these will be encrypted at rest)
+   STRIPE_SECRET_KEY=your_stripe_key
+   SLACK_WEBHOOK_URL=your_slack_webhook
    ```
 
 3. Configure your environment variables in `.env`:

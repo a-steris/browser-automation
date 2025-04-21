@@ -3,152 +3,198 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Stripe Report Downloader</title>
+    <title>Asteris - Financial Workflow Automation</title>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
+        body {
+            background: linear-gradient(135deg, #fecdd3 0%, #fef3c7 50%, #fed7aa 100%);
+            min-height: 100vh;
+        }
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(254, 202, 202, 0.5);
+        }
+        .integration-card {
+            background: linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%);
+            border: 1px solid #fecaca;
+            transition: all 0.3s ease;
+        }
+        .integration-card:hover {
+            background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        .aws-card {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            border: 1px solid #fcd34d;
+        }
+        .aws-card:hover {
+            background: linear-gradient(135deg, #fde68a 0%, #fcd34d 100%);
+        }
         /* Mobile-first styles */
         .help-container {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
-            display: inline-flex;
-            align-items: flex-start;
-            z-index: 1000;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 50;
         }
-
         .side-modal {
             position: fixed;
             top: 0;
-            left: 0;
             right: 0;
-            bottom: 0;
             width: 100%;
             height: 100%;
-            background: rgba(255, 255, 255, 0.98);
-            padding: 2rem 1rem;
-            opacity: 0;
+            max-width: 32rem;
+            transform: translateX(100%);
+            transition: transform 0.3s ease-in-out;
             visibility: hidden;
-            transform: translateY(-10px);
-            transition: all 0.2s ease-out;
-            pointer-events: none;
-            overflow-y: auto;
+            opacity: 0;
         }
-
-        .modal-trigger:hover + .side-modal,
-        .side-modal:hover {
-            opacity: 1;
+        .side-modal.active {
+            transform: translateX(0);
             visibility: visible;
-            transform: translateY(0);
-            pointer-events: auto;
+            opacity: 1;
         }
-
-        /* Desktop styles (768px and above) */
-        @media (min-width: 768px) {
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            visibility: hidden;
+            opacity: 0;
+            transition: opacity 0.3s ease-in-out;
+        }
+        .modal-overlay.active {
+            visibility: visible;
+            opacity: 1;
+        }
+        @media (max-width: 768px) {
             .side-modal {
-                position: absolute;
-                top: 0;
-                left: auto;
-                right: calc(100% + 10px);
-                bottom: auto;
-                width: 400px;
-                height: auto;
-                background: white;
-                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-                border-radius: 0.5rem;
-                transform: translateX(10px);
-            }
-
-            .modal-trigger:hover + .side-modal,
-            .side-modal:hover {
-                transform: translateX(0);
-            }
-        }
-
-        /* Responsive container */
-        .responsive-container {
-            max-width: 100%;
-            padding: 1rem;
-            margin: 2rem;
-        }
-        @media (min-width: 768px) {
-            .responsive-container {
-                max-width: 28rem;
-                padding: 0;
-                margin: 3rem;
+                max-width: 100%;
             }
         }
     </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-blue-100 via-indigo-100 to-purple-100 font-sans">
+<body class="min-h-screen font-sans">
     <!-- Help Button and Modal Container -->
     <div class="help-container">
-        <button class="modal-trigger bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors duration-200 flex items-center gap-2 relative z-50">
+        <button class="modal-trigger bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors duration-200 flex items-center gap-2 relative z-50">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            API Key Help
+            <span>Help</span>
         </button>
-        
-        <!-- Side Modal for API Key Help -->
+
+        <div class="modal-overlay"></div>
         <div class="side-modal p-8 overflow-y-auto bg-white shadow-2xl">
             <div class="space-y-6 max-w-lg mx-auto">
-            <!-- Close button for mobile -->
-            <button class="md:hidden absolute top-4 right-4 text-gray-500 hover:text-gray-700" onclick="this.parentElement.parentElement.style.visibility='hidden';this.parentElement.parentElement.style.opacity='0';">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-                <h2 class="text-2xl font-bold text-indigo-700 mb-4">How to Get Your API Key:</h2>
-                <ol class="list-decimal list-inside space-y-4 text-gray-600">
-                    <li class="flex items-start">
-                        <span class="mr-2">Go to</span>
-                        <a href="https://dashboard.stripe.com" target="_blank" class="text-indigo-600 hover:text-indigo-800 underline">dashboard.stripe.com</a>
-                        <span class="ml-1">and login</span>
-                    </li>
-                    <li>Switch to Test mode using the toggle at the top right</li>
-                    <li>Go to Developers → API keys</li>
-                    <li>Copy your <span class="font-mono bg-gray-100 px-2 py-0.5 rounded">Secret key</span> (starts with 'sk_test_')</li>
-                </ol>
+                <!-- Close button for mobile -->
+                <button class="md:hidden absolute top-4 right-4 text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
 
-                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
-                    <h3 class="text-lg font-semibold text-yellow-800 mb-2">Important:</h3>
-                    <ul class="list-disc list-inside space-y-2 text-yellow-800">
-                        <li>Make sure you're in TEST mode</li>
-                        <li>Only use keys that start with 'sk_test_'</li>
-                        <li>Never share or commit your API keys</li>
-                    </ul>
+                <div class="text-center">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-4">Getting Started</h2>
+                    <p class="text-gray-600">Follow these steps to set up your Stripe integration:</p>
+                </div>
+
+                <div>
+                    <h2 class="text-2xl font-bold text-red-600 mb-4">How to Get Your API Key:</h2>
+                    <ol class="list-decimal list-inside space-y-4 text-gray-600">
+                        <li class="flex items-start">
+                            <span class="mr-2">Go to</span>
+                            <a href="https://dashboard.stripe.com" target="_blank" class="text-red-500 hover:text-red-700 underline">dashboard.stripe.com</a>
+                            <span class="ml-1">and login</span>
+                        </li>
+                        <li>Switch to Test mode using the toggle at the top right</li>
+                        <li>Go to Developers → API keys</li>
+                        <li>Copy your <span class="font-mono bg-gray-100 px-2 py-0.5 rounded">Secret key</span> (starts with 'sk_test_')</li>
+                    </ol>
+
+                    <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mt-6">
+                        <h3 class="text-lg font-semibold text-yellow-800 mb-2">Important:</h3>
+                        <ul class="list-disc list-inside space-y-2 text-yellow-800">
+                            <li>Make sure you're in TEST mode</li>
+                            <li>Only use keys that start with 'sk_test_'</li>
+                            <li>Never share or commit your API keys</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="responsive-container bg-white/80 rounded-3xl shadow-2xl py-20 md:py-24 px-12 md:px-16 backdrop-blur-md border border-gray-200">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-center mb-16 text-indigo-700 tracking-tight drop-shadow">Stripe Report Downloader</h1>
-            
-            <!-- Test Mode Notice -->
-            <div class="mb-16 text-center">
-                <span class="inline-flex items-center gap-3 bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 px-6 md:px-8 py-4 rounded-xl shadow-sm border border-yellow-200 font-semibold text-base md:text-lg">
-                    <svg xmlns='http://www.w3.org/2000/svg' class='h-5 w-5 md:h-6 md:w-6 text-yellow-500 flex-shrink-0' fill='none' viewBox='0 0 24 24' stroke='currentColor'><path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z' /></svg>
-                    <span>Currently running in <span class="text-yellow-900">Stripe Test Mode</span>. Only test data will be shown.</span>
-                </span>
+        <div class="responsive-container main-container rounded-3xl shadow-2xl py-12 md:py-16 px-8 sm:px-12 md:px-20 lg:px-24 max-w-[90rem] mx-auto w-[95%]">
+            <div class="text-center mb-12">
+                <h2 class="text-4xl font-bold tracking-tight text-gray-900 sm:text-5xl md:text-6xl mb-4">
+                    <span class="text-red-500">Asteris</span>
+                </h2>
+                <p class="mt-3 text-base text-gray-500 sm:mt-5 sm:text-lg sm:max-w-xl sm:mx-auto md:mt-5 md:text-xl lg:mx-0">
+                    Optimize cloud costs with real-time insights—all in one place.
+                </p>
             </div>
+            <div class="mt-12 grid grid-cols-1 md:grid-cols-2 gap-8 mx-auto">
+                <!-- Stripe Card -->
+                <a href="/settings" class="block group">
+                    <div class="integration-card rounded-lg shadow-lg overflow-hidden group-hover:shadow-xl transition-all duration-300 p-6">
+                        <div class="w-12 h-12 bg-rose-100 text-rose-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-rose-200 transition-colors duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2 group-hover:text-rose-600 transition-colors duration-300">Stripe Integration</h3>
+                        <p class="text-gray-600 mb-4 group-hover:text-gray-700 transition-colors duration-300">Track payments, monitor revenue, and analyze customer data with our Stripe integration.</p>
+                        <div class="flex items-center text-rose-600 font-medium">
+                            <span>Configure Integration</span>
+                            <svg class="ml-2 w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </div>
+                    </div>
+                </a>
 
-            <!-- CTA Buttons -->
-            <div class="text-center mt-8 mb-8 space-y-4">
-                <div>
-                    <a href="/login" class="inline-flex items-center gap-4 bg-indigo-600 text-white px-10 py-5 rounded-xl hover:bg-indigo-700 transition-colors duration-200 font-semibold text-xl shadow-xl hover:shadow-2xl transform hover:-translate-y-1 transition-all duration-200">
-                        <svg xmlns='http://www.w3.org/2000/svg' class='h-6 w-6' fill='none' viewBox='0 0 24 24' stroke='currentColor'>
-                            <path stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13 10V3L4 14h7v7l9-11h-7z' />
-                        </svg>
-                        Login to Stripe
-                    </a>
-                </div>
+                <!-- AWS Card -->
+                <a href="/settings" class="block group">
+                    <div class="integration-card aws-card rounded-lg shadow-lg overflow-hidden group-hover:shadow-xl transition-all duration-300 p-6">
+                        <div class="w-12 h-12 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-amber-200 transition-colors duration-300">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2 group-hover:text-amber-600 transition-colors duration-300">AWS Integration</h3>
+                        <p class="text-gray-600 mb-4 group-hover:text-gray-700 transition-colors duration-300">Monitor AWS costs, analyze service usage, and optimize cloud spending in real-time.</p>
+                        <div class="flex items-center text-amber-600 font-medium">
+                            <span>Configure Integration</span>
+                            <svg class="ml-2 w-5 h-5 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                        </div>
+                    </div>
+                </a>
             </div>
-
         </div>
     </div>
 
+    <script>
+        document.querySelector('.modal-trigger').addEventListener('click', function() {
+            document.querySelector('.modal-overlay').classList.add('active');
+            document.querySelector('.side-modal').classList.add('active');
+        });
 
+        document.querySelector('.modal-overlay').addEventListener('click', function() {
+            document.querySelector('.modal-overlay').classList.remove('active');
+            document.querySelector('.side-modal').classList.remove('active');
+        });
+
+        document.querySelector('.md\\:hidden').addEventListener('click', function() {
+            document.querySelector('.modal-overlay').classList.remove('active');
+            document.querySelector('.side-modal').classList.remove('active');
+        });
+    </script>
 </body>
 </html>

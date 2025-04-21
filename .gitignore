@@ -19,6 +19,14 @@ lib64/
 parts/
 sdist/
 var/
+
+# Node.js
+node_modules/
+package-lock.json
+
+# Generated files
+static/css/
+!static/src/
 *.egg-info/
 .installed.cfg
 *.egg

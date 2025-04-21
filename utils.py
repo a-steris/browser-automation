@@ -58,10 +58,9 @@ def generate_report_csv(data, report_type='payments'):
 
 
 
-def send_slack_message(csv_content, report_type='payments', data=None):
-    webhook_url = os.getenv('SLACK_WEBHOOK_URL')
+def send_slack_message(csv_content, report_type='payments', data=None, webhook_url=None):
     if not webhook_url:
-        raise ValueError("SLACK_WEBHOOK_URL not found in environment variables")
+        raise ValueError("Slack webhook URL is required")
     
     try:
         # Generate summary statistics
