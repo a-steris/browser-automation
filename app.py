@@ -1,7 +1,9 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response
-from datetime import datetime
+from datetime import datetime, timedelta
 from io import StringIO
+import io
 import csv
+import time
 from flask import Flask, render_template, request, jsonify, session, send_file
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_talisman import Talisman
@@ -429,6 +431,10 @@ def create_test_data():
         if 'stripe_key' not in session:
             return jsonify({'success': False, 'error': 'Stripe key not found'})
             
+        # Decrypt the Stripe key
+        stripe_key = decrypt_data(session['stripe_key'])
+        stripe.api_key = stripe_key
+            
         # Create test charges directly
         payments = []
         for i in range(3):
@@ -436,8 +442,7 @@ def create_test_data():
                 amount=1000,  # $10.00
                 currency='usd',
                 source='tok_visa',  # Test Visa card token
-                description=f'Test payment {i+1}',
-                api_key=session['stripe_key']
+                description=f'Test payment {i+1}'
             )
             payments.append(charge)
 
@@ -447,8 +452,7 @@ def create_test_data():
             customer = stripe.Customer.create(
                 email=f'test{i}@example.com',
                 description=f'Test customer {i+1}',
-                source='tok_visa',  # Test Visa card token
-                api_key=session['stripe_key']
+                source='tok_visa'  # Test Visa card token
             )
             customers.append(customer)
 
@@ -482,28 +486,52 @@ def save_slack_settings():
 def sync_and_download_invoices():
     """Sync latest invoices and return as CSV"""
     try:
-        # Get latest invoices from Stripe
-        invoices = stripe.Invoice.list(
+        # Decrypt Stripe key
+        stripe_key = decrypt_data(session['stripe_key'])
+        stripe.api_key = stripe_key
+
+        # Get invoices from the last 365 days
+        one_year_ago = int((datetime.now() - timedelta(days=365)).timestamp())
+        
+        # Get all invoices using auto-pagination
+        invoices = []
+        for invoice in stripe.Invoice.list(
+            created={'gte': one_year_ago},
             limit=100,
-            created={'gte': int(time.time() - 86400)}  # Last 24 hours
-        )
+            expand=['data.customer']
+        ).auto_paging_iter():
+            invoices.append(invoice)
+            # Limit to 1000 invoices for performance
+            if len(invoices) >= 1000:
+                break
 
         # Convert to list of dicts
-        invoice_data = [{
-            'Invoice ID': inv.id,
-            'Amount': f"${inv.amount_due / 100:.2f}",
-            'Status': inv.status,
-            'Customer ID': inv.customer,
-            'Created Date': datetime.fromtimestamp(inv.created).strftime('%Y-%m-%d %H:%M:%S'),
-            'Due Date': datetime.fromtimestamp(inv.due_date).strftime('%Y-%m-%d %H:%M:%S') if inv.due_date else 'N/A',
-            'Paid': 'Yes' if inv.paid else 'No',
-            'Description': inv.description or 'N/A'
-        } for inv in invoices.data]
+        invoice_data = []
+        for inv in invoices:
+            # Get customer details
+            customer_email = 'N/A'
+            if inv.customer:
+                try:
+                    customer = stripe.Customer.retrieve(inv.customer)
+                    customer_email = customer.email or 'N/A'
+                except stripe.error.StripeError:
+                    pass
+
+            invoice_data.append({
+                'Invoice ID': inv.id,
+                'Amount': f"${inv.amount_due / 100:.2f}",
+                'Status': inv.status,
+                'Customer Email': customer_email,
+                'Created Date': datetime.fromtimestamp(inv.created).strftime('%Y-%m-%d %H:%M:%S'),
+                'Due Date': datetime.fromtimestamp(inv.due_date).strftime('%Y-%m-%d %H:%M:%S') if inv.due_date else 'N/A',
+                'Paid': 'Yes' if inv.paid else 'No',
+                'Description': inv.description or 'N/A'
+            })
 
         if not invoice_data:
             return jsonify({
                 'success': False,
-                'error': 'No invoices found in the last 24 hours'
+                'error': 'No invoices found in the last year'
             })
 
         # Create CSV in memory
@@ -525,6 +553,33 @@ def sync_and_download_invoices():
             'error': str(e)
         })
 
+def generate_report_csv(data, export_type):
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    if export_type == 'payments':
+        writer.writerow(['Amount', 'Currency', 'Status', 'Description', 'Created', 'Customer Email'])
+        for payment in data:
+            writer.writerow([
+                payment['amount'],
+                payment['currency'],
+                payment['status'],
+                payment['description'],
+                payment['created'],
+                payment['customer_email']
+            ])
+    elif export_type == 'customers':
+        writer.writerow(['Email', 'Created', 'Total Payments', 'Total Spent'])
+        for customer in data:
+            writer.writerow([
+                customer['email'],
+                customer['created'],
+                customer['total_payments'],
+                customer['total_spent']
+            ])
+    
+    return output.getvalue()
+
 @app.route('/api/export/csv', methods=['GET', 'POST'])
 @require_stripe_key
 def export_csv():
@@ -535,6 +590,10 @@ def export_csv():
         else:
             data = request.args
 
+        # Decrypt Stripe key
+        stripe_key = decrypt_data(session['stripe_key'])
+        stripe.api_key = stripe_key
+
         export_type = data.get('type', 'payments')
         notification_type = data.get('notification', 'download')  # download, email, or slack
         email = data.get('email')
@@ -544,46 +603,49 @@ def export_csv():
             # Get payment data with customer details
             charges = stripe.Charge.list(
                 limit=100,
-                created={'gte': int((datetime.now() - timedelta(days=date_range)).timestamp())},
-                expand=['data.customer'],
-                api_key=session['stripe_key']
+                created={'gte': int((datetime.now() - timedelta(days=date_range)).timestamp())}
             )
             
-            payments = [{
-                'amount': charge.amount / 100,
-                'currency': charge.currency,
-                'status': charge.status,
-                'description': charge.description,
-                'created': datetime.fromtimestamp(charge.created).isoformat(),
-                'customer_email': charge.customer.email if charge.customer else None
-            } for charge in charges.data]
+            payments = []
+            for charge in charges.data:
+                customer = None
+                if charge.customer:
+                    try:
+                        customer = stripe.Customer.retrieve(charge.customer)
+                    except stripe.error.StripeError:
+                        pass
+
+                payment_data = {
+                    'amount': f"{charge.amount / 100:.2f}",
+                    'currency': charge.currency.upper(),
+                    'status': charge.status,
+                    'description': charge.description or 'No description',
+                    'created': datetime.fromtimestamp(charge.created).strftime('%Y-%m-%d %H:%M:%S'),
+                    'customer_email': customer.email if customer else 'No customer'
+                }
+                payments.append(payment_data)
             
             data = payments
             
         elif export_type == 'customers':
             # Get customer data with their payment history
-            customers = stripe.Customer.list(
-                limit=100,
-                expand=['data.subscriptions'],
-                api_key=session['stripe_key']
-            )
+            customers = stripe.Customer.list(limit=100)
             
             customer_data = []
             for customer in customers.data:
                 # Get customer's charges
                 charges = stripe.Charge.list(
                     customer=customer.id,
-                    limit=100,
-                    api_key=session['stripe_key']
+                    limit=100
                 )
                 
                 total_spent = sum(charge.amount / 100 for charge in charges.data)
                 
                 customer_data.append({
-                    'email': customer.email,
-                    'created': datetime.fromtimestamp(customer.created).isoformat(),
+                    'email': customer.email or 'No email',
+                    'created': datetime.fromtimestamp(customer.created).strftime('%Y-%m-%d %H:%M:%S'),
                     'total_payments': len(charges.data),
-                    'total_spent': total_spent
+                    'total_spent': f"{total_spent:.2f}"
                 })
             
             data = customer_data
