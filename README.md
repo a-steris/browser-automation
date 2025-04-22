@@ -1,4 +1,4 @@
-# Stripe Report Downloader
+# Asteris
 
 A modern web application that provides easy access to Stripe financial data, automated reporting, and seamless export options. Built with Flask and styled with Tailwind CSS.
 
