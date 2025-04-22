@@ -550,9 +550,12 @@
                 const button = event.target.closest('button');
                 if (!button) return;
                 
+                const loadingClass = 'opacity-50 cursor-not-allowed';
                 button.disabled = true;
-                const originalText = button.innerHTML;
-                button.innerHTML = 'Syncing...';
+                button.classList.add(...loadingClass.split(' '));
+                const originalText = button.textContent;
+                button.textContent = 'Syncing...';
+
 
                 fetch('/api/invoices/sync-and-download', {
                     method: 'POST',
@@ -588,7 +591,8 @@
                 })
                 .finally(() => {
                     button.disabled = false;
-                    button.innerHTML = originalText;
+                    button.classList.remove(...loadingClass.split(' '));
+                    button.textContent = originalText;
                 });
             }
 
