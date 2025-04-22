@@ -79,8 +79,8 @@
                         <div class="bg-white shadow rounded-lg p-6">
                             <h2 class="text-xl font-semibold mb-4">Quick Actions</h2>
                             <div class="space-y-3">
-                                <button onclick="syncAndDownloadInvoices(event)" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-                                    Sync & Download Invoices
+                                <button onclick="syncAndDownloadInvoices(event)" class="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all duration-200 ease-in-out">
+                                    <span>Sync & Download Invoices</span>
                                 </button>
                             </div>
                         </div>
@@ -550,11 +550,12 @@
                 const button = event.target.closest('button');
                 if (!button) return;
                 
-                const loadingClass = 'opacity-50 cursor-not-allowed';
                 button.disabled = true;
-                button.classList.add(...loadingClass.split(' '));
-                const originalText = button.textContent;
-                button.textContent = 'Syncing...';
+                const span = button.querySelector('span');
+                const originalText = span.textContent;
+                button.classList.add('opacity-50', 'cursor-not-allowed');
+                span.textContent = 'Syncing...';
+
 
 
                 fetch('/api/invoices/sync-and-download', {
@@ -591,8 +592,8 @@
                 })
                 .finally(() => {
                     button.disabled = false;
-                    button.classList.remove(...loadingClass.split(' '));
-                    button.textContent = originalText;
+                    button.classList.remove('opacity-50', 'cursor-not-allowed');
+                    button.querySelector('span').textContent = originalText;
                 });
             }
 
