@@ -1,6 +1,6 @@
 # Asteris
 
-A modern platform for managing and optimizing cloud costs across Stripe and AWS. Built with Flask and styled with Tailwind CSS.
+A modern platform for managing and optimizing cloud costs across Stripe and AWS. 
 
 ## Features
 
@@ -74,7 +74,7 @@ A modern platform for managing and optimizing cloud costs across Stripe and AWS.
 
 2. Visit `http://localhost:5001` in your browser
 
-3. Log in using your Stripe Secret Key (test mode recommended)
+3. Log in using your Stripe Secret Key (test mode recommended) and configure your AWS access key(s)
 
 4. Access features:
    - View real-time balance
@@ -85,7 +85,7 @@ A modern platform for managing and optimizing cloud costs across Stripe and AWS.
 ## Development
 
 1. The application runs in test mode by default
-2. Use Stripe test API keys for development
+2. Use Stripe test API keys for development, and AWS access key(s)
 3. Test data can be generated from the dashboard
 4. All API routes are protected with login_required
 
