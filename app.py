@@ -7,6 +7,7 @@ import time
 from flask import Flask, render_template, request, jsonify, session, send_file
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from flask_talisman import Talisman
+from flask_cors import CORS
 from cryptography.fernet import Fernet
 import stripe
 import boto3
@@ -19,6 +20,9 @@ from utils import generate_report_csv, send_slack_message
 from functools import wraps
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+
+# Enable CORS
+CORS(app, supports_credentials=True)
 
 # Load environment variables
 load_dotenv()
@@ -41,14 +45,15 @@ app.config['SESSION_COOKIE_NAME'] = 'asteris_session'  # Custom session cookie n
 
 # Configure Talisman security headers
 Talisman(app,
-    force_https=is_production,
-    strict_transport_security=is_production,
-    session_cookie_secure=is_production,
+    force_https=False,  # Disable HTTPS enforcement
+    strict_transport_security=False,
+    session_cookie_secure=False,
     content_security_policy={
         'default-src': [
             "'self'",
             "'unsafe-inline'",
             "'unsafe-eval'",
+            "http://localhost:5001",  # Allow localhost HTTP
             "https://cdn.tailwindcss.com",
             "https://unpkg.com",
             "https://cdn.jsdelivr.net",
@@ -411,40 +416,91 @@ def get_recent_customers():
 @app.route('/api/create-test-data', methods=['POST'])
 def create_test_data():
     try:
+        print('Starting test data creation...')
         if 'stripe_key' not in session:
+            print('No Stripe key in session')
             return jsonify({'success': False, 'error': 'Stripe key not found'})
             
         # Decrypt the Stripe key
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
+        try:
+            stripe_key = decrypt_data(session['stripe_key'])
+            stripe.api_key = stripe_key
+            print('Successfully set Stripe key')
+        except Exception as e:
+            print(f'Error decrypting Stripe key: {str(e)}')
+            return jsonify({'success': False, 'error': f'Error decrypting Stripe key: {str(e)}'})
             
-        # Create test charges directly
-        payments = []
-        for i in range(3):
-            charge = stripe.Charge.create(
-                amount=1000,  # $10.00
-                currency='usd',
-                source='tok_visa',  # Test Visa card token
-                description=f'Test payment {i+1}'
-            )
-            payments.append(charge)
-
-        # Create test customers
+        # Create test customers first
+        print('Creating test customers...')
         customers = []
         for i in range(3):
-            customer = stripe.Customer.create(
-                email=f'test{i}@example.com',
-                description=f'Test customer {i+1}',
-                source='tok_visa'  # Test Visa card token
+            try:
+                customer = stripe.Customer.create(
+                    email=f'test{i}@example.com',
+                    description=f'Test customer {i+1}',
+                    source='tok_visa'  # Test Visa card token
+                )
+                customers.append(customer)
+                print(f'Created customer {i+1}')
+            except Exception as e:
+                print(f'Error creating customer {i+1}: {str(e)}')
+                return jsonify({'success': False, 'error': f'Error creating customer: {str(e)}'})
+
+        # Create test products and prices
+        print('Creating test product and price...')
+        try:
+            product = stripe.Product.create(
+                name='Test Product',
+                description='Product for testing'
             )
-            customers.append(customer)
+            print('Created product')
+            
+            price = stripe.Price.create(
+                product=product.id,
+                unit_amount=1000,  # $10.00
+                currency='usd'
+            )
+            print('Created price')
+        except Exception as e:
+            print(f'Error creating product/price: {str(e)}')
+            return jsonify({'success': False, 'error': f'Error creating product/price: {str(e)}'})
+
+        # Create invoices for each customer
+        print('Creating invoices...')
+        invoices = []
+        for i, customer in enumerate(customers, 1):
+            try:
+                # Create invoice items
+                print(f'Creating invoice items for customer {i}...')
+                stripe.InvoiceItem.create(
+                    customer=customer.id,
+                    price=price.id,
+                    quantity=1
+                )
+                
+                # Create and finalize invoice
+                print(f'Creating invoice for customer {i}...')
+                invoice = stripe.Invoice.create(
+                    customer=customer.id,
+                    auto_advance=True,  # Auto-finalize the invoice
+                    collection_method='charge_automatically'
+                )
+                
+                # Pay the invoice
+                print(f'Paying invoice for customer {i}...')
+                invoice.pay()
+                invoices.append(invoice)
+                print(f'Successfully created and paid invoice for customer {i}')
+            except Exception as e:
+                print(f'Error creating invoice for customer {i}: {str(e)}')
+                return jsonify({'success': False, 'error': f'Error creating invoice: {str(e)}'})
 
         return jsonify({
             'success': True,
             'message': 'Test data created successfully',
             'data': {
                 'customers': len(customers),
-                'payments': len(payments)
+                'invoices': len(invoices)
             }
         })
     except stripe.error.StripeError as e:
@@ -469,24 +525,51 @@ def save_slack_settings():
 def sync_and_download_invoices():
     """Sync latest invoices and return as CSV"""
     try:
+        print("Starting invoice sync...")
+        print(f"Session keys: {session.keys()}")
+        
+        if 'stripe_key' not in session:
+            return jsonify({
+                'success': False,
+                'error': 'Stripe key not found in session. Please set up your Stripe credentials first.'
+            })
+            
         # Decrypt Stripe key
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
+        try:
+            stripe_key = decrypt_data(session['stripe_key'])
+            stripe.api_key = stripe_key
+            print("Successfully decrypted and set Stripe key")
+        except Exception as e:
+            print(f"Error decrypting Stripe key: {str(e)}")
+            return jsonify({
+                'success': False,
+                'error': 'Error decrypting Stripe key. Please try setting up your Stripe credentials again.'
+            })
 
         # Get invoices from the last 365 days
+        print('Fetching invoices from the last year...')
         one_year_ago = int((datetime.now() - timedelta(days=365)).timestamp())
         
         # Get all invoices using auto-pagination
         invoices = []
-        for invoice in stripe.Invoice.list(
-            created={'gte': one_year_ago},
-            limit=100,
-            expand=['data.customer']
-        ).auto_paging_iter():
-            invoices.append(invoice)
-            # Limit to 1000 invoices for performance
-            if len(invoices) >= 1000:
-                break
+        try:
+            print(f'Searching for invoices created after {datetime.fromtimestamp(one_year_ago)}...')
+            for invoice in stripe.Invoice.list(
+                created={'gte': one_year_ago},
+                limit=100,
+                expand=['data.customer']
+            ).auto_paging_iter():
+                invoices.append(invoice)
+                # Limit to 1000 invoices for performance
+                if len(invoices) >= 1000:
+                    break
+            print(f'Found {len(invoices)} invoices')
+        except Exception as e:
+            print(f'Error fetching invoices: {str(e)}')
+            return jsonify({
+                'success': False,
+                'error': f'Error fetching invoices: {str(e)}'
+            })
 
         # Convert to list of dicts
         invoice_data = []
