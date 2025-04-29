@@ -72,6 +72,20 @@
                                 <span class="status-text">Not Connected</span>
                             </span>
                         </div>
+                        <div class="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-blue-700">
+                                        For now, we use a secure, encrypted method where you provide a read-only API key. You can generate a Restricted Key from your Stripe dashboard in 30 seconds. We only access your invoice data, and you can revoke the key anytime. In the next version, we will support 1-click OAuth for even simpler setup.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
                         <form id="stripeForm" method="POST" action="/api/settings/stripe" class="space-y-4" onsubmit="console.log('Form submitted');">
                             <div>
                                 <label for="stripeKey" class="block text-sm font-medium text-gray-700">API Key</label>
@@ -126,6 +140,20 @@
                             <span id="aws-status" class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
                                 Not Connected
                             </span>
+                        </div>
+                        <div class="mb-6 bg-blue-50 border-l-4 border-blue-400 p-4">
+                            <div class="flex">
+                                <div class="flex-shrink-0">
+                                    <svg class="h-5 w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd" />
+                                    </svg>
+                                </div>
+                                <div class="ml-3">
+                                    <p class="text-sm text-blue-700">
+                                        We use a secure method where you provide read-only AWS credentials. Create an IAM user with Cost Explorer access only - we recommend using AWS built-in policy 'AWSBillingReadOnlyAccess'. You can revoke these credentials anytime. In the next version, we will support AWS SSO for enhanced security.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                         <form id="aws-form" class="space-y-4" onsubmit="handleAWSSubmit(event)">
                             <div>
