@@ -12,6 +12,9 @@ This documentation provides comprehensive information about the Browser Automati
 2. [Integrations](integrations/README.md)
    - [Stripe Integration](integrations/stripe.md)
    - [AWS Integration](integrations/aws.md)
+   - [GitHub Integration](integrations/github.md)
+   - [Notion Integration](integrations/notion.md)
+   - [Zendesk Integration](integrations/zendesk.md)
    - [Slack Integration](integrations/slack.md)
 
 3. [API Documentation](api/README.md)
