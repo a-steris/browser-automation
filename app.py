@@ -11,11 +11,14 @@ from flask_cors import CORS
 from cryptography.fernet import Fernet
 import stripe
 import boto3
-from botocore.exceptions import ClientError
+import json
 import os
+import uuid
+import requests
 from datetime import datetime, timedelta
-from decimal import Decimal
 from dotenv import load_dotenv
+from functools import wraps
+from urllib.parse import urlencode
 from utils import generate_report_csv, send_slack_message
 from functools import wraps
 
@@ -27,9 +30,29 @@ CORS(app, supports_credentials=True)
 # Load environment variables
 load_dotenv()
 
-# Initialize encryption key
-ENCRYPTION_KEY = b'zSl4qQJlxFET6_JvCeEpzDjQc-DINgEGTwu8Pnor1vw='
-fernet = Fernet(ENCRYPTION_KEY)
+# Initialize Fernet for encryption
+def generate_fernet_key():
+    return Fernet.generate_key()
+
+# Get or generate encryption key
+key = os.getenv('ENCRYPTION_KEY')
+if not key:
+    key = generate_fernet_key().decode()
+    print(f"Generated new encryption key. Please add this to your .env file:\nENCRYPTION_KEY={key}")
+
+fernet = Fernet(key.encode())
+
+# Stripe configuration
+STRIPE_CLIENT_ID = os.getenv('STRIPE_CLIENT_ID')
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY')
+STRIPE_REDIRECT_URI = os.getenv('STRIPE_REDIRECT_URI', 'http://localhost:5001/auth/stripe/callback')
+
+# AWS configuration
+AWS_CLIENT_ID = os.getenv('AWS_CLIENT_ID')
+AWS_CLIENT_SECRET = os.getenv('AWS_CLIENT_SECRET')
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+AWS_REDIRECT_URI = os.getenv('AWS_REDIRECT_URI', 'http://localhost:5001/auth/aws/callback')
+AWS_SSO_START_URL = os.getenv('AWS_SSO_START_URL')
 
 # Configure Flask app
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')  # for session management
@@ -63,7 +86,6 @@ Talisman(app,
     }
 )
 
-# Initialize Flask-Login
 # Initialize Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -106,11 +128,122 @@ def load_user(user_id):
 def index():
     return render_template('index.html')
 
-
-
 @app.route('/settings')
 def settings():
     return render_template('settings.html')
+
+@app.route('/auth/stripe')
+def stripe_auth():
+    # Generate a random state value for security
+    state = str(uuid.uuid4())
+    session['oauth_state'] = state
+
+    params = {
+        'response_type': 'code',
+        'client_id': STRIPE_CLIENT_ID,
+        'scope': 'read_write',
+        'state': state,
+        'redirect_uri': STRIPE_REDIRECT_URI
+    }
+    
+    auth_url = f'https://connect.stripe.com/oauth/authorize?{urlencode(params)}'
+    return redirect(auth_url)
+
+@app.route('/auth/stripe/callback')
+def stripe_callback():
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+
+        # Verify state to prevent CSRF
+        if state != session.get('oauth_state'):
+            return 'Invalid state parameter', 400
+
+        # Exchange code for access token
+        response = requests.post(
+            'https://connect.stripe.com/oauth/token',
+            data={
+                'client_secret': STRIPE_SECRET_KEY,
+                'grant_type': 'authorization_code',
+                'code': code
+            }
+        )
+
+        data = response.json()
+        if 'error' in data:
+            return f'Error: {data["error_description"]}', 400
+
+        # Store the access token securely
+        access_token = data['access_token']
+        encrypted_token = encrypt_data(access_token)
+        session['stripe_key'] = encrypted_token
+
+        # Initialize Stripe with the access token
+        stripe.api_key = access_token
+
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        return f'Error: {str(e)}', 400
+
+@app.route('/auth/aws')
+def aws_auth():
+    # Generate a random state value for security
+    state = str(uuid.uuid4())
+    session['aws_oauth_state'] = state
+
+    # AWS SSO authorization URL
+    params = {
+        'client_id': AWS_CLIENT_ID,
+        'response_type': 'code',
+        'state': state,
+        'redirect_uri': AWS_REDIRECT_URI,
+        'scope': 'ce:View'
+    }
+
+    auth_url = f'{AWS_SSO_START_URL}/oauth2/authorize?{urlencode(params)}'
+    return redirect(auth_url)
+
+@app.route('/auth/aws/callback')
+def aws_callback():
+    try:
+        code = request.args.get('code')
+        state = request.args.get('state')
+
+        # Verify state to prevent CSRF
+        if state != session.get('aws_oauth_state'):
+            return 'Invalid state parameter', 400
+
+        # Exchange code for access token
+        token_url = f'{AWS_SSO_START_URL}/oauth2/token'
+        response = requests.post(
+            token_url,
+            data={
+                'grant_type': 'authorization_code',
+                'client_id': AWS_CLIENT_ID,
+                'client_secret': AWS_CLIENT_SECRET,
+                'code': code,
+                'redirect_uri': AWS_REDIRECT_URI
+            }
+        )
+
+        data = response.json()
+        if 'error' in data:
+            return f'Error: {data.get("error_description", data["error"])}', 400
+
+        # Store the tokens securely
+        access_token = data['access_token']
+        encrypted_token = encrypt_data(access_token)
+        session['aws_access_token'] = encrypted_token
+
+        # Store refresh token if provided
+        if 'refresh_token' in data:
+            refresh_token = data['refresh_token']
+            encrypted_refresh = encrypt_data(refresh_token)
+            session['aws_refresh_token'] = encrypted_refresh
+
+        return redirect(url_for('dashboard'))
+    except Exception as e:
+        return f'Error: {str(e)}', 400
 
 @app.route('/api/settings/stripe', methods=['POST'])
 def save_stripe_settings():

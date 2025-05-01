@@ -18,18 +18,18 @@
                         <span class="text-xl font-semibold"><span class="text-indigo-600">Asteris</span></span>
                         <!-- Portal Switcher -->
                         <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-                            <button onclick="switchPortal('stripe')" 
+                            <a href="#stripe" onclick="switchPortal('stripe')" 
                                     id="stripe-tab"
-                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none"
+                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none cursor-pointer"
                                     :class="{ 'bg-white shadow text-gray-800': activePortal === 'stripe', 'text-gray-600 hover:text-gray-800': activePortal !== 'stripe' }">
                                 Stripe
-                            </button>
-                            <button onclick="switchPortal('aws')"
+                            </a>
+                            <a href="#aws" onclick="switchPortal('aws')"
                                     id="aws-tab"
-                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none"
+                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none cursor-pointer"
                                     :class="{ 'bg-white shadow text-gray-800': activePortal === 'aws', 'text-gray-600 hover:text-gray-800': activePortal !== 'aws' }">
                                 AWS
-                            </button>
+                            </a>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -50,10 +50,6 @@
                     </div>
                     <div class="ml-3">
                         <h3 class="text-sm font-medium text-yellow-800">Secure API Access</h3>
-                        <div class="mt-2 text-sm text-yellow-700">
-                            <p class="mb-2">For now, we use a secure, encrypted method where you provide a read-only API key. You can generate a Restricted Key from your Stripe dashboard in 30 seconds. In the next version, we will support 1-click OAuth for even simpler setup.</p>
-                            <p>Create test data below to see how the dashboard works.</p>
-                        </div>
                         <div class="mt-4">
                             <button id="createTestData" class="inline-flex rounded-md bg-yellow-50 px-2 py-1 text-sm font-semibold text-yellow-800 hover:bg-yellow-100">
                                 Create Test Data
@@ -169,13 +165,47 @@
                     <div class="bg-white shadow rounded-lg p-6">
                         <div class="flex justify-between items-center mb-6">
                             <h2 class="text-xl font-semibold">AWS Cost Overview</h2>
-                            <a href="/aws/config" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Configure AWS</a>
-                                <svg class="inline-block w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            {% if not session.get('aws_access_token') %}
+                            <a href="/auth/aws" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#232F3E] hover:bg-[#1a242f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#232F3E]">
+                                <svg class="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M7.5 12L10.5 15L16.5 9M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                                 </svg>
+                                Connect AWS Account
                             </a>
+                            {% else %}
+                            <div class="flex items-center">
+                                <span class="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                                    <svg class="w-4 h-4 mr-1" viewBox="0 0 24 24" fill="none">
+                                        <path d="M9 12L11 14L15 10M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                    </svg>
+                                    Connected
+                                </span>
+                                <a href="/settings" class="ml-4 text-gray-600 hover:text-gray-900 text-sm">Settings</a>
+                            </div>
+                            {% endif %}
                         </div>
 
+                        <div class="flex flex-col items-center justify-center space-y-6 p-8">
+                            <img src="https://upload.wikimedia.org/wikipedia/commons/9/93/Amazon_Web_Services_Logo.svg" alt="AWS Logo" class="h-12">
+                            <p class="text-gray-600">Connect your AWS account to view and analyze your AWS costs.</p>
+                            
+                            {% if not session.get('aws_access_token') %}
+                            <a href="/auth/aws" class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-[#232F3E] hover:bg-[#1a242f] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#232F3E] shadow-sm transition-colors duration-200">
+                                <svg class="w-5 h-5 mr-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M15 7h3a5 5 0 010 10h-3m-6 0H6a5 5 0 110-10h3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                                Connect with AWS
+                            </a>
+                            {% else %}
+                            <div class="flex items-center space-x-2 text-green-700">
+                                <svg class="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                <span class="text-sm font-medium">Connected to AWS</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% else %}
                         <div id="aws-costs" class="space-y-6">
                             <!-- Monthly Cost Overview -->
                             <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -192,6 +222,7 @@
                                     <p class="mt-2 text-2xl font-semibold text-gray-900" id="projected-cost">Loading...</p>
                                 </div>
                             </div>
+                        {% endif %}
 
                             <!-- Service Breakdown -->
                             <div>
@@ -261,7 +292,12 @@
 
         <script>
             // Portal switching
-            let activePortal = 'stripe';
+            let activePortal = window.location.hash === '#aws' ? 'aws' : 'stripe';
+            
+            // Set initial portal state
+            document.addEventListener('DOMContentLoaded', function() {
+                switchPortal(activePortal);
+            });
 
             function switchPortal(portal) {
                 // Update active portal
