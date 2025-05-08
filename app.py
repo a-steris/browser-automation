@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, Blueprint, make_response
 from datetime import datetime, timedelta
 from io import StringIO
 import io
@@ -19,10 +19,26 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 from functools import wraps
 from urllib.parse import urlencode
+# Route blueprints will be imported here
+from routes.stripe_oauth import stripe_oauth_bp
+stripe_bp = Blueprint('stripe', __name__)
+aws_bp = Blueprint('aws', __name__)
+notion_bp = Blueprint('notion', __name__)
 from utils import generate_report_csv, send_slack_message
 from functools import wraps
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', os.urandom(24))
+
+# Register blueprints
+app.register_blueprint(stripe_oauth_bp)
+app.register_blueprint(stripe_bp, url_prefix='/api/stripe')
+app.register_blueprint(aws_bp, url_prefix='/api/aws')
+app.register_blueprint(notion_bp, url_prefix='/api/notion')
+
+@app.route('/connect')
+def connect_page():
+    return render_template('connect.html')
 
 # Enable CORS
 CORS(app, supports_credentials=True)
@@ -57,7 +73,7 @@ AWS_SSO_START_URL = os.getenv('AWS_SSO_START_URL')
 # Configure Flask app
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')  # for session management
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)  # Extended session lifetime for convenience
 
 # Set secure cookie settings based on environment
 is_production = os.getenv('FLASK_ENV') != 'development'
@@ -121,8 +137,15 @@ class User(UserMixin):
 
 @login_manager.user_loader
 def load_user(user_id):
-    # In a real application, you would load the user from your database
-    return User(user_id)
+    user = User(user_id)
+    # Auto-sync invoices when user is loaded
+    if 'notion_api_key' in session:
+        sync_invoices_background(session.get('notion_api_key'))
+    return user
+
+app.register_blueprint(stripe_bp)
+app.register_blueprint(aws_bp)
+app.register_blueprint(notion_bp)
 
 @app.route('/')
 def index():
@@ -134,56 +157,22 @@ def settings():
 
 @app.route('/auth/stripe')
 def stripe_auth():
-    # Generate a random state value for security
-    state = str(uuid.uuid4())
-    session['oauth_state'] = state
-
-    params = {
-        'response_type': 'code',
-        'client_id': STRIPE_CLIENT_ID,
-        'scope': 'read_write',
-        'state': state,
-        'redirect_uri': STRIPE_REDIRECT_URI
-    }
-    
-    auth_url = f'https://connect.stripe.com/oauth/authorize?{urlencode(params)}'
-    return redirect(auth_url)
-
-@app.route('/auth/stripe/callback')
-def stripe_callback():
     try:
-        code = request.args.get('code')
-        state = request.args.get('state')
-
-        # Verify state to prevent CSRF
-        if state != session.get('oauth_state'):
-            return 'Invalid state parameter', 400
-
-        # Exchange code for access token
-        response = requests.post(
-            'https://connect.stripe.com/oauth/token',
-            data={
-                'client_secret': STRIPE_SECRET_KEY,
-                'grant_type': 'authorization_code',
-                'code': code
-            }
-        )
-
-        data = response.json()
-        if 'error' in data:
-            return f'Error: {data["error_description"]}', 400
-
-        # Store the access token securely
-        access_token = data['access_token']
-        encrypted_token = encrypt_data(access_token)
-        session['stripe_key'] = encrypted_token
-
-        # Initialize Stripe with the access token
-        stripe.api_key = access_token
-
+        # Use the secret key directly
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+        
+        # Test the connection
+        stripe.Account.retrieve()
+        
+        # Store the encrypted key in session
+        session['stripe_key'] = encrypt_data(stripe.api_key)
+        
         return redirect(url_for('dashboard'))
+        
     except Exception as e:
-        return f'Error: {str(e)}', 400
+        return f'Error connecting to Stripe: {str(e)}', 400
+
+# Removed OAuth callback as we're using direct API key authentication
 
 @app.route('/auth/aws')
 def aws_auth():
