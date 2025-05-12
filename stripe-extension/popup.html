@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Stripe Invoice Downloader</title>
+  <style>
+    body {
+      width: 320px;
+      padding: 16px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      color: #1f2937;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .header img {
+      width: 24px;
+      height: 24px;
+    }
+    .status-box {
+      background-color: #f3f4f6;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 14px;
+    }
+    .status-box.error {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+    .status-box.success {
+      background-color: #ecfdf5;
+      color: #059669;
+    }
+    button {
+      background-color: #635bff;
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    button:hover {
+      background-color: #4b44d1;
+      transform: translateY(-1px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    button:disabled {
+      background-color: #e5e7eb;
+      color: #9ca3af;
+      cursor: not-allowed;
+      transform: none;
+    }
+    .status {
+      font-size: 14px;
+      color: #6b7280;
+      margin-top: 12px;
+      line-height: 1.5;
+    }
+    .help-text {
+      font-size: 12px;
+      color: #6b7280;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <img src="images/icon48.png" alt="Logo">
+      <h1>Stripe Invoice Downloader</h1>
+    </div>
+    
+    <div id="statusBox" class="status-box success">
+      Ready to download invoices
+    </div>
+
+    <button id="downloadInvoices">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M8 1v11m0 0l4-4m-4 4L4 8m11 4v2a1 1 0 01-1 1H2a1 1 0 01-1-1v-2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Download All Invoices
+    </button>
+
+    <p class="help-text">
+      Click the button to automatically download all your Stripe invoices. The extension will navigate to the invoices page if needed.
+    </p>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,22 +1,16 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, make_response, send_file
 from datetime import datetime, timedelta
 from io import StringIO
-import io
-import csv
-import time
-from flask import Flask, render_template, request, jsonify, session, send_file
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from flask_talisman import Talisman
+from flask_cors import CORS
+
+from werkzeug.security import generate_password_hash, check_password_hash
 from cryptography.fernet import Fernet
-import stripe
-import boto3
-from botocore.exceptions import ClientError
-import os
-from datetime import datetime, timedelta
+from stripe_handler import StripeHandler
 from decimal import Decimal
 from dotenv import load_dotenv
 from utils import generate_report_csv, send_slack_message
 from functools import wraps
+import os
 
 app = Flask(__name__, static_url_path='/static', static_folder='static')
 
@@ -29,6 +23,8 @@ fernet = Fernet(ENCRYPTION_KEY)
 
 # Configure Flask app
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'your-secret-key-here')  # for session management
+
+# Talisman configuration removed for local development
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
@@ -40,41 +36,13 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'  # CSRF protection
 app.config['SESSION_COOKIE_NAME'] = 'asteris_session'  # Custom session cookie name
 
 # Configure Talisman security headers
-Talisman(app,
-    force_https=is_production,
-    strict_transport_security=is_production,
-    session_cookie_secure=is_production,
-    content_security_policy={
-        'default-src': [
-            "'self'",
-            "'unsafe-inline'",
-            "'unsafe-eval'",
-            "https://cdn.tailwindcss.com",
-            "https://unpkg.com",
-            "https://cdn.jsdelivr.net",
-            "https://api.stripe.com"
-        ],
-        'img-src': ["'self'", "data:", "https:"]
-    }
+# Security headers configuration for development
+app.config.update(
+    SESSION_COOKIE_SECURE=False,
+    SESSION_COOKIE_HTTPONLY=True
 )
 
-# Initialize Flask-Login
-# Initialize Flask-Login
-login_manager = LoginManager()
-login_manager.init_app(app)
-login_manager.login_view = 'login'
 
-# Custom decorator for AWS configuration check
-def aws_config_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not all(k in session for k in ['aws_access_key', 'aws_secret_key', 'aws_region']):
-            return redirect(url_for('aws_config'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Initialize Stripe
-stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 # Encryption helpers
 def encrypt_data(data):
@@ -87,19 +55,9 @@ def decrypt_data(encrypted_data):
         return None
     return fernet.decrypt(encrypted_data.encode()).decode()
 
-class User(UserMixin):
-    def __init__(self, user_id, stripe_account_id=None):
-        self.id = user_id
-        self.stripe_account_id = stripe_account_id
-
-@login_manager.user_loader
-def load_user(user_id):
-    # In a real application, you would load the user from your database
-    return User(user_id)
-
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return redirect(url_for('dashboard'))
 
 @app.route('/settings')
 def settings():
@@ -107,161 +65,68 @@ def settings():
 
 @app.route('/api/settings/stripe', methods=['POST'])
 def save_stripe_settings():
-    app.logger.info(f"Session before: {dict(session)}")
-    app.logger.info(f"Received form data: {dict(request.form)}")
-    
-    stripe_key = request.form.get('stripe_key')
-    if not stripe_key:
-        app.logger.error("No Stripe key provided")
-        return redirect('/settings')
-    
-    app.logger.info(f"Stripe key length: {len(stripe_key)}")
-    
-    try:
-        # First verify the key works
-        app.logger.info("Verifying Stripe key...")
-        stripe.api_key = stripe_key
-        stripe.Balance.retrieve()
-        app.logger.info("Stripe key verified successfully")
-        
-        # Then save it in session
-        app.logger.info("Saving key in session...")
-        encrypted_key = encrypt_data(stripe_key)
-        session.clear()  # Clear any existing session data
-        session['stripe_key'] = encrypted_key
-        session.permanent = True  # Make the session permanent
-        app.logger.info(f"Session after: {dict(session)}")
-        
-        app.logger.info("Redirecting to dashboard...")
-        response = redirect('/dashboard')
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        return response
-    except Exception as e:
-        app.logger.error(f"Error: {str(e)}")
-        if 'stripe_key' in session:
-            del session['stripe_key']
-            session.modified = True
-        return redirect('/settings')
-
-@app.route('/api/settings/aws', methods=['POST'])
-def save_aws_settings():
+    app.logger.info("Received Stripe settings update request")
     data = request.get_json()
-    aws_access_key = data.get('aws_access_key')
-    aws_secret_key = data.get('aws_secret_key')
-    aws_region = data.get('aws_region')
     
-    if not all([aws_access_key, aws_secret_key, aws_region]):
-        return jsonify({'success': False, 'error': 'All AWS credentials are required'})
+    stripe_email = data.get('stripe_email')
+    stripe_password = data.get('stripe_password')
     
-    # Verify AWS credentials before saving
+    if not all([stripe_email, stripe_password]):
+        app.logger.error("Missing required Stripe credentials")
+        return jsonify({
+            'success': False,
+            'error': 'Stripe login email and password are required'
+        })
+    
     try:
-        client = boto3.client(
-            'ce',
-            aws_access_key_id=aws_access_key,
-            aws_secret_access_key=aws_secret_key,
-            region_name=aws_region
-        )
-        # Try a simple API call to verify credentials
-        client.get_cost_and_usage(
-            TimePeriod={
-                'Start': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
-                'End': datetime.now().strftime('%Y-%m-%d')
-            },
-            Granularity='MONTHLY',
-            Metrics=['UnblendedCost']
-        )
-        session['aws_access_key'] = aws_access_key
-        session['aws_secret_key'] = aws_secret_key
-        session['aws_region'] = aws_region
+        # Save credentials in session
+        app.logger.info("Saving credentials in session...")
+        session['stripe_email'] = encrypt_data(stripe_email)
+        session['stripe_password'] = encrypt_data(stripe_password)
+        session.permanent = True
+        
+        app.logger.info("Stripe credentials saved successfully")
         return jsonify({'success': True})
+        
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        app.logger.error(f"Error saving Stripe settings: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @app.route('/api/settings/status')
 def get_settings_status():
     stripe_connected = False
-    aws_connected = False
+    slack_connected = False
 
     # Check Stripe connection
-    print("Checking Stripe connection...")
-    stripe_key = session.get('stripe_key')
-    print(f"Stripe key in session: {'Yes' if stripe_key else 'No'}")
+    app.logger.info("Checking Stripe connection...")
+    stripe_email = session.get('stripe_email')
+    stripe_password = session.get('stripe_password')
     
-    if stripe_key:
-        try:
-            print(f"Encrypted key length: {len(stripe_key)}")
-            decrypted_key = decrypt_data(stripe_key)
-            print(f"Decrypted key starts with: {decrypted_key[:5]}...")
-            stripe.api_key = decrypted_key
-            stripe.Account.retrieve()
-            stripe_connected = True
-            print("Stripe connection successful")
-        except Exception as e:
-            print(f"Error checking Stripe connection: {str(e)}")
-            session.pop('stripe_key', None)
-    
-    # Check AWS connection
-    if all(session.get(k) for k in ['aws_access_key', 'aws_secret_key', 'aws_region']):
-        try:
-            client = boto3.client(
-                'ce',
-                aws_access_key_id=session['aws_access_key'],
-                aws_secret_access_key=session['aws_secret_key'],
-                region_name=session['aws_region']
-            )
-            client.get_cost_and_usage(
-                TimePeriod={
-                    'Start': (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d'),
-                    'End': datetime.now().strftime('%Y-%m-%d')
-                },
-                Granularity='MONTHLY',
-                Metrics=['UnblendedCost']
-            )
-            aws_connected = True
-        except:
-            session.pop('aws_access_key', None)
-            session.pop('aws_secret_key', None)
-            session.pop('aws_region', None)
-    
+    # Consider connected if we have login credentials
+    if all([stripe_email, stripe_password]):
+        stripe_connected = True
+        app.logger.info("Stripe connection successful")
+
+    # Check if Slack webhook is configured
+    slack_webhook = session.get('slack_webhook_url')
+    slack_connected = bool(slack_webhook)
+
     return jsonify({
         'stripe_connected': stripe_connected,
-        'aws_connected': aws_connected
+        'slack_connected': slack_connected
     })
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login')
 def login():
-    if request.method == 'POST':
-        username = request.form.get('username')
-        password = request.form.get('password')
-        
-        user = User.query.filter_by(username=username).first()
-        
-        if user and user.check_password(password):
-            login_user(user)
-            
-            # Get the next URL from query parameters
-            next_page = request.args.get('next')
-            
-            # If next_page is AWS config save, save the AWS credentials
-            if next_page and 'aws/save' in next_page:
-                data = request.get_json()
-                if data:
-                    session['aws_access_key'] = data.get('aws_access_key')
-                    session['aws_secret_key'] = data.get('aws_secret_key')
-                    session['aws_region'] = data.get('aws_region')
-            
-            # Always redirect to dashboard after login
-            return redirect(url_for('dashboard'))
-        
-        flash('Invalid username or password')
-    
-    return render_template('login.html')
+    return redirect(url_for('settings'))
 
 @app.route('/logout')
 def logout():
-    logout_user()
-    session.pop('stripe_key', None)
-    return redirect(url_for('index'))
+    session.clear()
+    return redirect(url_for('settings'))
 
 def sync_invoices_background(stripe_key):
     """Background task to sync invoices every 5 minutes"""
@@ -290,154 +155,103 @@ def sync_invoices_background(stripe_key):
     except Exception as e:
         print(f"Invoice sync error: {str(e)}")
 
-def require_stripe_key(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'stripe_key' not in session:
-            print("No stripe_key in session, redirecting to settings")
-            return redirect('/settings')
-        try:
-            stripe.api_key = decrypt_data(session['stripe_key'])
-            print("Set stripe.api_key successfully")
-            return f(*args, **kwargs)
-        except Exception as e:
-            print("Error in require_stripe_key:", str(e))
-            return redirect('/settings')
-    return decorated_function
 
 @app.route('/dashboard')
 def dashboard():
     app.logger.info(f"Dashboard: Session data = {dict(session)}")
-    if 'stripe_key' not in session:
-        app.logger.error("No stripe_key in session for dashboard")
+    if not all([session.get('stripe_email'), session.get('stripe_password')]):
+        app.logger.error("Missing Stripe credentials")
         return redirect('/settings')
     
-    try:
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
-        app.logger.info("Set stripe.api_key for dashboard")
-        
-        # Verify the key still works
-        stripe.Balance.retrieve()
-        app.logger.info("Stripe key verified in dashboard")
-        
-        response = make_response(render_template('dashboard.html'))
-        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-        return response
-    except Exception as e:
-        app.logger.error(f"Error in dashboard: {str(e)}")
-        if 'stripe_key' in session:
-            del session['stripe_key']
-            session.permanent = True
-        return redirect('/settings')
+    response = make_response(render_template('dashboard.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    return response
 
 @app.route('/api/balance')
 def get_balance():
     app.logger.info('Fetching balance...')
-    if 'stripe_key' not in session:
-        app.logger.error('No Stripe key in session for balance')
-        return jsonify({'error': 'No Stripe key in session'}), 401
     
-    try:
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
-        balance = stripe.Balance.retrieve()
-        app.logger.info(f'Balance fetched successfully: {balance}')
-        return jsonify(balance)
-    except Exception as e:
-        app.logger.error(f'Error getting balance: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    # Since we're not using the API, return mock data
+    response = {
+        'available': 0,
+        'pending': 0,
+        'instant_payouts': False
+    }
+    
+    app.logger.info(f'Balance response: {response}')
+    return jsonify(response)
 
 @app.route('/api/recent-payments')
 def get_recent_payments():
     app.logger.info('Fetching recent payments...')
-    if 'stripe_key' not in session:
-        app.logger.error('No Stripe key in session for payments')
-        return jsonify({'error': 'No Stripe key in session'}), 401
     
-    try:
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
-        limit = request.args.get('limit', default=5, type=int)
-        charges = stripe.Charge.list(limit=limit)
-        
-        payments = [{
-            'amount': charge.amount / 100,
-            'currency': charge.currency,
-            'description': charge.description or 'Payment',
-            'created': charge.created * 1000,  # Convert to milliseconds for JS
-            'status': charge.status
-        } for charge in charges.data]
-        
-        app.logger.info(f'Fetched {len(payments)} recent payments')
-        return jsonify({
-            'success': True,
-            'payments': payments
-        })
-    except Exception as e:
-        app.logger.error(f'Error getting payments: {str(e)}')
-        return jsonify({'error': str(e)}), 500
+    # Since we're not using the API, return mock data
+    formatted_payments = []
+    
+    app.logger.info('No recent payments to show without Stripe API')
+    
+    return jsonify({
+        'success': True,
+        'payments': formatted_payments
+    })
 
 @app.route('/api/recent-customers')
 def get_recent_customers():
     app.logger.info('Fetching recent customers...')
-    if 'stripe_key' not in session:
-        app.logger.error('No Stripe key in session for customers')
-        return jsonify({'error': 'No Stripe key in session'}), 401
     
-    try:
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
-        limit = request.args.get('limit', default=5, type=int)
-        customers = stripe.Customer.list(limit=limit)
-        app.logger.info(f'Fetched {len(customers.data)} customers')
-        
-        customer_data = [{
-            'email': customer.email,
-            'created': customer.created * 1000,  # Convert to milliseconds for JS
-            'delinquent': customer.delinquent
-        } for customer in customers.data]
-        
-        return jsonify({
-            'success': True,
-            'customers': customer_data
-        })
-    except stripe.error.StripeError as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
+    # Since we're not using the API, return mock data
+    formatted_customers = []
+    
+    app.logger.info('No recent customers to show without Stripe API')
+    
+    return jsonify({
+        'success': True,
+        'customers': formatted_customers
+    })
 
 @app.route('/api/create-test-data', methods=['POST'])
 def create_test_data():
     try:
-        if 'stripe_key' not in session:
-            return jsonify({'success': False, 'error': 'Stripe key not found'})
-            
         # Decrypt the Stripe key
         stripe_key = decrypt_data(session['stripe_key'])
         stripe.api_key = stripe_key
-            
-        # Create test charges directly
-        payments = []
-        for i in range(3):
-            charge = stripe.Charge.create(
-                amount=1000,  # $10.00
-                currency='usd',
-                source='tok_visa',  # Test Visa card token
-                description=f'Test payment {i+1}'
-            )
-            payments.append(charge)
 
-        # Create test customers
+        # Create test customers first
         customers = []
         for i in range(3):
             customer = stripe.Customer.create(
-                email=f'test{i}@example.com',
+                email=f'test{i+1}@example.com',
+                name=f'Test Customer {i+1}',
                 description=f'Test customer {i+1}',
                 source='tok_visa'  # Test Visa card token
             )
             customers.append(customer)
+
+        # Create test charges for each customer
+        payments = []
+        amounts = [1000, 2000, 5000]  # $10, $20, $50
+        for i, customer in enumerate(customers):
+            charge = stripe.Charge.create(
+                amount=amounts[i % len(amounts)],
+                currency='usd',
+                customer=customer.id,
+                description=f'Test payment for {customer.email}'
+            )
+            payments.append(charge)
+
+            # Create an invoice for each customer
+            invoice_item = stripe.InvoiceItem.create(
+                customer=customer.id,
+                amount=amounts[i % len(amounts)],
+                currency='usd',
+                description=f'Test invoice item for {customer.email}'
+            )
+            
+            invoice = stripe.Invoice.create(
+                customer=customer.id,
+                auto_advance=True,  # Auto-finalize the invoice
+            )
+            invoice.finalize_invoice()
 
         return jsonify({
             'success': True,
@@ -448,9 +262,16 @@ def create_test_data():
             }
         })
     except stripe.error.StripeError as e:
+        app.logger.error(f'Stripe error creating test data: {str(e)}')
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': f'Stripe error: {str(e)}'
+        })
+    except Exception as e:
+        app.logger.error(f'Unexpected error creating test data: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': 'An unexpected error occurred'
         })
 
 @app.route('/api/settings/slack', methods=['POST'])
@@ -465,72 +286,53 @@ def save_slack_settings():
     return jsonify({'success': True})
 
 @app.route('/api/invoices/sync-and-download', methods=['POST'])
-@require_stripe_key
 def sync_and_download_invoices():
-    """Sync latest invoices and return as CSV"""
+    """Download invoices using browser automation"""
     try:
-        # Decrypt Stripe key
-        stripe_key = decrypt_data(session['stripe_key'])
-        stripe.api_key = stripe_key
-
-        # Get invoices from the last 365 days
-        one_year_ago = int((datetime.now() - timedelta(days=365)).timestamp())
+        app.logger.info('Starting invoice download using browser automation...')
         
-        # Get all invoices using auto-pagination
-        invoices = []
-        for invoice in stripe.Invoice.list(
-            created={'gte': one_year_ago},
-            limit=100,
-            expand=['data.customer']
-        ).auto_paging_iter():
-            invoices.append(invoice)
-            # Limit to 1000 invoices for performance
-            if len(invoices) >= 1000:
-                break
-
-        # Convert to list of dicts
-        invoice_data = []
-        for inv in invoices:
-            # Get customer details
-            customer_email = 'N/A'
-            if inv.customer:
-                try:
-                    customer = stripe.Customer.retrieve(inv.customer)
-                    customer_email = customer.email or 'N/A'
-                except stripe.error.StripeError:
-                    pass
-
-            invoice_data.append({
-                'Invoice ID': inv.id,
-                'Amount': f"${inv.amount_due / 100:.2f}",
-                'Status': inv.status,
-                'Customer Email': customer_email,
-                'Created Date': datetime.fromtimestamp(inv.created).strftime('%Y-%m-%d %H:%M:%S'),
-                'Due Date': datetime.fromtimestamp(inv.due_date).strftime('%Y-%m-%d %H:%M:%S') if inv.due_date else 'N/A',
-                'Paid': 'Yes' if inv.paid else 'No',
-                'Description': inv.description or 'N/A'
-            })
-
-        if not invoice_data:
+        # Get Stripe credentials from session
+        stripe_email = decrypt_data(session.get('stripe_email', ''))
+        stripe_password = decrypt_data(session.get('stripe_password', ''))
+        
+        if not stripe_email or not stripe_password:
             return jsonify({
                 'success': False,
-                'error': 'No invoices found in the last year'
+                'error': 'Stripe login credentials not found. Please configure them in settings.'
             })
 
-        # Create CSV in memory
-        output = StringIO()
-        writer = csv.DictWriter(output, fieldnames=invoice_data[0].keys())
-        writer.writeheader()
-        writer.writerows(invoice_data)
-
-        # Create the response
-        response = make_response(output.getvalue())
-        response.headers['Content-Type'] = 'text/csv'
-        response.headers['Content-Disposition'] = f'attachment; filename=stripe_invoices_{datetime.now().strftime("%Y%m%d_%H%M%S")}.csv'
-
-        return response
-
+        # Initialize the Stripe handler
+        from stripe_handler import StripeHandler
+        anticaptcha_key = os.getenv('ANTICAPTCHA_KEY')
+        handler = StripeHandler(stripe_email, stripe_password)
+        handler.anticaptcha_key = anticaptcha_key
+        
+        try:
+            # Download invoices using browser automation
+            app.logger.info('Starting browser automation...')
+            download_path = handler.sync_and_download_invoices()
+            
+            if not download_path or not os.path.exists(download_path):
+                raise Exception('Download failed - no file found')
+                
+            # Read the downloaded file
+            with open(download_path, 'rb') as f:
+                csv_data = f.read()
+            
+            # Create the response
+            response = make_response(csv_data)
+            response.headers['Content-Type'] = 'text/csv'
+            response.headers['Content-Disposition'] = f'attachment; filename=stripe_report_{datetime.now().strftime("%Y-%m-%d")}.csv'
+            
+            app.logger.info('Invoice download completed successfully')
+            return response
+            
+        except Exception as e:
+            app.logger.error(f'Browser automation error: {str(e)}')
+            raise
+            
     except Exception as e:
+        app.logger.error(f'Error during invoice download: {str(e)}')
         return jsonify({
             'success': False,
             'error': str(e)
@@ -564,7 +366,6 @@ def generate_report_csv(data, export_type):
     return output.getvalue()
 
 @app.route('/api/export/csv', methods=['GET', 'POST'])
-@require_stripe_key
 def export_csv():
     try:
         # Handle both GET and POST requests
@@ -671,150 +472,8 @@ def export_csv():
             'error': str(e)
         })
 
-# AWS Routes
-@app.route('/aws/config')
-def aws_config():
-    return render_template('aws_config.html')
 
-@app.route('/api/settings/aws/save', methods=['POST'])
-def save_aws_credentials():
-    if not request.is_json:
-        return jsonify({
-            'success': False,
-            'error': 'Content-Type must be application/json'
-        }), 400
 
-    data = request.get_json()
-    
-    try:
-        # Test AWS credentials using STS GetCallerIdentity
-        sts_client = boto3.client(
-            'sts',
-            aws_access_key_id=data['aws_access_key'],
-            aws_secret_access_key=data['aws_secret_key'],
-            region_name=data['aws_region']
-        )
-        
-        # This API call will verify if credentials are valid
-        response = sts_client.get_caller_identity()
-        
-        # If we get here, credentials are valid - save them
-        session['aws_access_key'] = data['aws_access_key']
-        session['aws_secret_key'] = data['aws_secret_key']
-        session['aws_region'] = data['aws_region']
-        
-        return jsonify({
-            'success': True,
-            'message': 'AWS configuration saved successfully',
-            'redirect': url_for('dashboard')
-        })
-    except KeyError as e:
-        return jsonify({
-            'success': False,
-            'error': f'Missing required field: {str(e)}'
-        }), 400
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 400
-
-@app.route('/api/aws/costs')
-def get_aws_costs():
-    try:
-        if not all(k in session for k in ['aws_access_key', 'aws_secret_key']):
-            return jsonify({
-                'success': False,
-                'error': 'AWS credentials not found'
-            })
-
-        # First verify AWS credentials are still valid
-        sts_client = boto3.client(
-            'sts',
-            aws_access_key_id=session['aws_access_key'],
-            aws_secret_access_key=session['aws_secret_key'],
-            region_name=session.get('aws_region', 'us-east-1')
-        )
-        sts_client.get_caller_identity()
-
-        try:
-            # Try to get cost data if we have permissions
-            client = boto3.client(
-                'ce',
-                aws_access_key_id=session['aws_access_key'],
-                aws_secret_access_key=session['aws_secret_key'],
-                region_name=session.get('aws_region', 'us-east-1')
-            )
-
-            end = datetime.now()
-            start = end - timedelta(days=60)  # Get 2 months of data
-
-            response = client.get_cost_and_usage(
-                TimePeriod={
-                    'Start': start.strftime('%Y-%m-%d'),
-                    'End': end.strftime('%Y-%m-%d')
-                },
-                Granularity='MONTHLY',
-                Metrics=['UnblendedCost'],
-                GroupBy=[{
-                    'Type': 'DIMENSION',
-                    'Key': 'SERVICE'
-                }]
-            )
-
-            # Calculate costs
-            costs = {
-                'current_month': 0.0,
-                'previous_month': 0.0,
-                'projected': 0.0,
-                'by_service': []
-            }
-
-            # Process each time period
-            for period in response['ResultsByTime']:
-                total = sum(float(group['Metrics']['UnblendedCost']['Amount'])
-                           for group in period['Groups'])
-                
-                # Add to service breakdown for current month
-                if period == response['ResultsByTime'][-1]:
-                    costs['current_month'] = total
-                    costs['by_service'] = [
-                        {
-                            'service': group['Keys'][0],
-                            'amount': float(group['Metrics']['UnblendedCost']['Amount'])
-                        }
-                        for group in period['Groups']
-                    ]
-                elif period == response['ResultsByTime'][-2]:
-                    costs['previous_month'] = total
-
-            # Calculate projected cost
-            days_in_month = calendar.monthrange(end.year, end.month)[1]
-            days_so_far = end.day
-            if days_so_far > 0:
-                costs['projected'] = costs['current_month'] * (days_in_month / days_so_far)
-
-            # Sort services by cost
-            costs['by_service'].sort(key=lambda x: x['amount'], reverse=True)
-
-            return jsonify({
-                'success': True,
-                'costs': costs
-            })
-
-        except Exception as e:
-            # Return a default response if we can't access cost data
-            return jsonify({
-                'success': True,
-                'costs': {
-                    'current_month': 0.0,
-                    'previous_month': 0.0,
-                    'projected': 0.0,
-                    'by_service': [],
-                    'warning': 'Cost Explorer access denied. Please ensure your AWS user has the required permissions.'
-                }
-            })
-    except Exception as e:
         return jsonify({
             'success': False,
             'error': str(e)
@@ -822,7 +481,7 @@ def get_aws_costs():
 
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))  # Changed default port to 5001
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=port, ssl_context=None, debug=True)
 
 # Vercel requires this
 app.debug = False

@@ -7,6 +7,7 @@ class StripeHandler:
         self.email = email or os.getenv('STRIPE_EMAIL')
         self.password = password or os.getenv('STRIPE_PASSWORD')
         self.download_dir = os.path.join(os.getcwd(), 'downloads')
+        self.anticaptcha_key = os.getenv('ANTICAPTCHA_KEY')
         os.makedirs(self.download_dir, exist_ok=True)
 
     def sync_and_download_invoices(self):
@@ -18,7 +19,7 @@ class StripeHandler:
             raise ValueError("Stripe credentials not set")
 
         try:
-            handler = AutomationHandler(self.email, self.password)
+            handler = AutomationHandler(self.email, self.password, anticaptcha_key=self.anticaptcha_key)
             download_path = handler.sync_and_download_invoices()
             return download_path
         except Exception as e:

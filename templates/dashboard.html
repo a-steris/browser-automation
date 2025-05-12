@@ -18,18 +18,7 @@
                         <span class="text-xl font-semibold"><span class="text-indigo-600">Asteris</span></span>
                         <!-- Portal Switcher -->
                         <div class="flex space-x-1 bg-gray-100 p-1 rounded-lg">
-                            <button onclick="switchPortal('stripe')" 
-                                    id="stripe-tab"
-                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none"
-                                    :class="{ 'bg-white shadow text-gray-800': activePortal === 'stripe', 'text-gray-600 hover:text-gray-800': activePortal !== 'stripe' }">
-                                Stripe
-                            </button>
-                            <button onclick="switchPortal('aws')"
-                                    id="aws-tab"
-                                    class="px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 focus:outline-none"
-                                    :class="{ 'bg-white shadow text-gray-800': activePortal === 'aws', 'text-gray-600 hover:text-gray-800': activePortal !== 'aws' }">
-                                AWS
-                            </button>
+                            <span class="px-4 py-2 rounded-md text-sm font-medium bg-white shadow text-gray-800">Stripe Dashboard</span>
                         </div>
                     </div>
                     <div class="flex items-center space-x-4">
@@ -64,7 +53,7 @@
             <!-- Main Content -->
             <div class="flex-grow container mx-auto px-4 py-8">
                 <!-- Stripe Portal -->
-                <div id="stripe-portal" class="space-y-6">
+                <div class="space-y-6">
                     <!-- Overview Section -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Balance Card -->
@@ -117,6 +106,15 @@
                     <div class="bg-white shadow rounded-lg p-6">
                         <h2 class="text-xl font-semibold mb-4">Export Data</h2>
                         <div class="space-y-4">
+                            <!-- Quick Invoice Download -->
+                            <div class="mb-6">
+                                <button onclick="syncAndDownloadInvoices(event)" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                                    <svg class="-ml-1 mr-2 h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                    </svg>
+                                    Download All Invoices
+                                </button>
+                            </div>
                             <!-- Report Type and Date Range -->
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
@@ -155,50 +153,7 @@
                         </div>
                     </div>
                 </div>
-                <!-- AWS Portal -->
-                <div id="aws-portal" class="space-y-6 hidden">
-                    <div class="bg-white shadow rounded-lg p-6">
-                        <div class="flex justify-between items-center mb-6">
-                            <h2 class="text-xl font-semibold">AWS Cost Overview</h2>
-                            <a href="/aws/config" class="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium">Configure AWS</a>
-                                <svg class="inline-block w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                            </a>
-                        </div>
 
-                        <div id="aws-costs" class="space-y-6">
-                            <!-- Monthly Cost Overview -->
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div class="bg-gray-50 p-4 rounded-lg">
-                                    <h3 class="text-sm font-medium text-gray-500">Current Month</h3>
-                                    <p class="mt-2 text-2xl font-semibold text-gray-900" id="current-month-cost">Loading...</p>
-                                </div>
-                                <div class="bg-gray-50 p-4 rounded-lg">
-                                    <h3 class="text-sm font-medium text-gray-500">Previous Month</h3>
-                                    <p class="mt-2 text-2xl font-semibold text-gray-900" id="previous-month-cost">Loading...</p>
-                                </div>
-                                <div class="bg-gray-50 p-4 rounded-lg">
-                                    <h3 class="text-sm font-medium text-gray-500">Projected</h3>
-                                    <p class="mt-2 text-2xl font-semibold text-gray-900" id="projected-cost">Loading...</p>
-                                </div>
-                            </div>
-
-                            <!-- Service Breakdown -->
-                            <div>
-                                <h3 class="text-sm font-medium text-gray-500 mb-4">Cost by Service</h3>
-                                <div id="service-costs" class="space-y-4">
-                                    <div class="text-center py-4">
-                                        <div class="animate-pulse flex space-x-4">
-                                            <div class="flex-1 space-y-4 py-1">
-                                                <div class="h-4 bg-gray-200 rounded w-3/4"></div>
-                                                <div class="space-y-3">
-                                                    <div class="h-4 bg-gray-200 rounded"></div>
-                                                    <div class="h-4 bg-gray-200 rounded"></div>
-                                                    <div class="h-4 bg-gray-200 rounded"></div>
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -260,7 +215,6 @@
 
                 // Update UI
                 document.getElementById('stripe-portal').classList.toggle('hidden', portal !== 'stripe');
-                document.getElementById('aws-portal').classList.toggle('hidden', portal !== 'aws');
 
                 // Update tab styles
                 document.getElementById('stripe-tab').classList.toggle('bg-white', portal === 'stripe');
@@ -268,39 +222,42 @@
                 document.getElementById('stripe-tab').classList.toggle('text-gray-800', portal === 'stripe');
                 document.getElementById('stripe-tab').classList.toggle('text-gray-600', portal !== 'stripe');
 
-                document.getElementById('aws-tab').classList.toggle('bg-white', portal === 'aws');
-                document.getElementById('aws-tab').classList.toggle('shadow', portal === 'aws');
-                document.getElementById('aws-tab').classList.toggle('text-gray-800', portal === 'aws');
-
                 // Fetch data for the active portal
                 if (portal === 'stripe') {
                     fetchStripeData();
-                } else {
-                    fetchAWSCosts();
                 }
             }
 
             // Create test data
-            document.getElementById('createTestData').addEventListener('click', function() {
-                this.disabled = true;
-                this.textContent = 'Creating...';
+            document.getElementById('createTestData').addEventListener('click', async function() {
+                const button = this;
+                button.disabled = true;
+                button.textContent = 'Creating...';
                 
-                axios.post('/api/create-test-data')
-                    .then(response => {
-                        if (response.data.success) {
-                            alert('Test data created successfully! Refreshing page...');
-                            window.location.reload();
-                        } else {
-                            alert('Error: ' + response.data.error);
-                        }
-                    })
-                    .catch(error => {
-                        alert('Error creating test data');
-                    })
-                    .finally(() => {
-                        this.disabled = false;
-                        this.textContent = 'Create Test Data';
+                try {
+                    const response = await fetch('/api/create-test-data', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        credentials: 'same-origin',
                     });
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        showNotification('Success', 'Test data created successfully! Refreshing page...', 'success');
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        throw new Error(data.error || 'Failed to create test data');
+                    }
+                } catch (error) {
+                    console.error('Error creating test data:', error);
+                    showNotification('Error', error.message || 'Failed to create test data', 'error');
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Create Test Data';
+                }
             });
 
             function exportData(type, event) {
@@ -435,153 +392,155 @@
                 }, 5000);
             }
 
-            // Fetch AWS costs
-            function fetchAWSCosts() {
-                axios.get('/api/aws/costs')
-                    .then(response => {
-                        if (response.data.success) {
-                            const costs = response.data.costs;
-                            document.getElementById('current-month-cost').textContent = 
-                                `$${costs.current_month.toFixed(2)}`;
-                            document.getElementById('previous-month-cost').textContent = 
-                                `$${costs.previous_month.toFixed(2)}`;
-                            document.getElementById('projected-cost').textContent = 
-                                `$${costs.projected.toFixed(2)}`;
+            // Fetch all Stripe data
+            async function fetchStripeData() {
+                try {
+                    // Show loading states
+                    document.getElementById('balance').innerHTML = '<div class="animate-pulse">Loading...</div>';
+                    document.getElementById('recentPayments').innerHTML = '<div class="animate-pulse">Loading...</div>';
+                    document.getElementById('recentCustomers').innerHTML = '<div class="animate-pulse">Loading...</div>';
 
-                            // Update service breakdown
-                            const servicesList = document.getElementById('service-costs');
-                            if (costs.by_service.length > 0) {
-                                servicesList.innerHTML = costs.by_service
-                                    .map(service => `
-                                        <div class="flex justify-between items-center p-3 bg-gray-50 rounded">
-                                            <span class="text-gray-700">${service.service}</span>
-                                            <span class="font-medium">$${service.amount.toFixed(2)}</span>
-                                        </div>
-                                    `).join('');
-                            } else {
-                                servicesList.innerHTML = '<div class="text-gray-600">No cost data available</div>';
+                    // Fetch balance
+                    const balanceResponse = await fetch('/api/balance');
+                    const balanceData = await balanceResponse.json();
+                    
+                    if (balanceData.success) {
+                        let balanceHtml = '';
+                        if (balanceData.balance.length > 0) {
+                            balanceHtml = balanceData.balance.map(b => 
+                                `<div class="mb-2">
+                                    <span class="font-medium">${b.currency.toUpperCase()}</span>: 
+                                    <span class="text-green-600">$${(b.amount/100).toFixed(2)}</span>
+                                </div>`
+                            ).join('');
+                            
+                            if (balanceData.pending.length > 0) {
+                                balanceHtml += '<div class="mt-4 text-sm text-gray-600">Pending:</div>';
+                                balanceHtml += balanceData.pending.map(b =>
+                                    `<div class="text-sm text-gray-600">${b.currency.toUpperCase()}: $${(b.amount/100).toFixed(2)}</div>`
+                                ).join('');
                             }
                         } else {
-                            document.getElementById('aws-costs').innerHTML = `
-                                <div class="text-center py-8">
-                                    <p class="text-gray-600 mb-4">AWS integration not configured</p>
-                                    <a href="/aws/config" class="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
-                                        Configure AWS
-                                    </a>
-                                </div>
-                            `;
+                            balanceHtml = '<div class="text-gray-600">No balance available</div>';
                         }
-                    })
-                    .catch(error => {
-                        console.error('AWS costs error:', error);
-                        document.getElementById('aws-costs').innerHTML = `
-                            <div class="text-center py-8">
-                                <p class="text-red-600 mb-4">Error loading AWS costs</p>
-                                <p class="text-sm text-gray-500">${error.response?.data?.error || error.message}</p>
-                            </div>
-                        `;
-                    });
-            }
+                        document.getElementById('balance').innerHTML = balanceHtml;
+                    } else {
+                        throw new Error(balanceData.error || 'Failed to load balance');
+                    }
 
-            // Fetch all Stripe data
-            function fetchStripeData() {
-                // Fetch balance
-                axios.get('/api/balance')
-                    .then(response => {
-                        if (response.data.success) {
-                            const balanceHtml = response.data.balance.map(b => 
-                                `${b.currency.toUpperCase()}: $${(b.amount/100).toFixed(2)}`
-                            ).join('<br>');
-                            document.getElementById('balance').innerHTML = balanceHtml;
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('balance').innerHTML = 'Error loading balance';
-                    });
-
-                // Fetch recent payments
-                axios.get('/api/recent-payments')
-                    .then(response => {
-                        if (response.data.success) {
-                            const paymentsHtml = response.data.payments.map(payment => `
-                                <div class="py-4">
-                                    <div class="flex justify-between">
-                                        <span class="font-medium">$${payment.amount.toFixed(2)} ${payment.currency.toUpperCase()}</span>
-                                        <span class="text-gray-500">${new Date(payment.created).toLocaleString()}</span>
+                    // Fetch recent payments
+                    const paymentsResponse = await fetch('/api/recent-payments');
+                    const paymentsData = await paymentsResponse.json();
+                    
+                    if (paymentsData.success) {
+                        const paymentsHtml = paymentsData.payments.length > 0 ?
+                            paymentsData.payments.map(payment => `
+                                <div class="py-4 border-b border-gray-200 last:border-0">
+                                    <div class="flex justify-between items-center">
+                                        <span class="font-medium text-green-600">$${(payment.amount/100).toFixed(2)} ${payment.currency.toUpperCase()}</span>
+                                        <span class="text-sm text-gray-500">${new Date(payment.created * 1000).toLocaleString()}</span>
                                     </div>
-                                    <div class="text-sm text-gray-500">
-                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${payment.status === 'succeeded' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
-                                            ${payment.status}
-                                        </span>
-                                        ${payment.description ? `<span class="ml-2">${payment.description}</span>` : ''}
-                                    </div>
+                                    <div class="text-sm text-gray-600 mt-1">${payment.description || 'No description'}</div>
                                 </div>
-                            `).join('');
-                            document.getElementById('payments').innerHTML = paymentsHtml || 'No recent payments';
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('payments').innerHTML = 'Error loading payments';
-                    });
+                            `).join('') :
+                            '<div class="py-4 text-gray-600">No recent payments</div>';
+                        document.getElementById('recentPayments').innerHTML = paymentsHtml;
+                    } else {
+                        throw new Error(paymentsData.error || 'Failed to load payments');
+                    }
 
-                // Fetch recent customers
-                axios.get('/api/recent-customers')
-                    .then(response => {
-                        if (response.data.success) {
-                            const customersHtml = response.data.customers.map(customer => `
-                                <div class="py-4">
-                                    <div class="flex justify-between">
+                    // Fetch recent customers
+                    const customersResponse = await fetch('/api/recent-customers');
+                    const customersData = await customersResponse.json();
+                    
+                    if (customersData.success) {
+                        const customersHtml = customersData.customers.length > 0 ?
+                            customersData.customers.map(customer => `
+                                <div class="py-4 border-b border-gray-200 last:border-0">
+                                    <div class="flex justify-between items-center">
                                         <span class="font-medium">${customer.email || 'No email'}</span>
-                                        <span class="text-gray-500">${new Date(customer.created).toLocaleString()}</span>
+                                        <span class="text-sm text-gray-500">${new Date(customer.created * 1000).toLocaleString()}</span>
                                     </div>
+                                    ${customer.description ? `<div class="text-sm text-gray-600 mt-1">${customer.description}</div>` : ''}
                                 </div>
-                            `).join('');
-                            document.getElementById('customers').innerHTML = customersHtml || 'No recent customers';
-                        }
-                    })
-                    .catch(error => {
-                        document.getElementById('customers').innerHTML = 'Error loading customers';
-                    });
+                            `).join('') :
+                            '<div class="py-4 text-gray-600">No customers yet</div>';
+                        document.getElementById('recentCustomers').innerHTML = customersHtml;
+                    } else {
+                        throw new Error(customersData.error || 'Failed to load customers');
+                    }
+                } catch (error) {
+                    console.error('Error fetching data:', error);
+                    showNotification('Error', error.message || 'Failed to load dashboard data', 'error');
+                }
             }
 
             // Function to sync and download invoices
-            function syncAndDownloadInvoices(event) {
+            async function syncAndDownloadInvoices(event) {
                 event.preventDefault();
                 const button = event.target.closest('button');
                 if (!button) return;
+
+                button.disabled = true;
+                const originalText = button.textContent;
+                button.textContent = 'Syncing...';
                 
-                fetch('/api/invoices/sync-and-download', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'text/csv'
-                    },
-                    credentials: 'same-origin'
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(data => {
+                try {
+                    const response = await fetch('/api/invoices/sync-and-download', {
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json, text/csv',
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'same-origin'
+                    });
+
+                    const contentType = response.headers.get('content-type');
+                    
+                    // If response is JSON, it's probably an error
+                    if (contentType && contentType.includes('application/json')) {
+                        const data = await response.json();
+                        if (!data.success) {
                             throw new Error(data.error || 'Failed to sync invoices');
-                        });
+                        }
                     }
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `stripe_invoices_${new Date().toISOString().split('T')[0]}.csv`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                    showNotification('Success', 'Invoices downloaded successfully', 'success');
-                })
-                .catch(error => {
+                    // If response is not JSON and not OK, it's an error
+                    else if (!response.ok) {
+                        throw new Error('Failed to sync invoices. Please try again.');
+                    }
+                    // If we got here, we should have a CSV file
+                    else if (contentType && contentType.includes('text/csv')) {
+                        const blob = await response.blob();
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.style.display = 'none';
+                        a.href = url;
+                        
+                        // Get filename from Content-Disposition or use default
+                        const disposition = response.headers.get('content-disposition');
+                        const filenameMatch = disposition && disposition.match(/filename=([^;]+)/i);
+                        const filename = filenameMatch ? filenameMatch[1].replace(/["']/g, '') : 
+                            `stripe_report_${new Date().toISOString().split('T')[0]}.csv`;
+                        
+                        a.download = filename;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        
+                        showNotification('Success', 'Invoices downloaded successfully', 'success');
+                        // Refresh dashboard data
+                        await fetchStripeData();
+                    } else {
+                        throw new Error('Invalid response type from server');
+                    }
+                } catch (error) {
                     console.error('Sync error:', error);
                     showNotification('Error', error.message || 'Failed to sync invoices', 'error');
-                });
+                } finally {
+                    button.disabled = false;
+                    button.textContent = originalText;
+                }
             }
 
             async function fetchStripeData() {
@@ -637,7 +596,6 @@
 
             // Initial data fetch
             fetchStripeData();
-            fetchAWSCosts();
 
             // Refresh data every 5 minutes
             setInterval(fetchStripeData, 5 * 60 * 1000);

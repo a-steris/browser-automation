@@ -1,3 +1,24 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+    body {
+        background: linear-gradient(135deg, #fecdd3 0%, #fef3c7 50%, #fed7aa 100%);
+        min-height: 100vh;
+    }
+    .main-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(12px);
+        border: 1px solid rgba(254, 202, 202, 0.5);
+    }
+    .integration-card {
+        background: linear-gradient(135deg, #fff1f2 0%, #fee2e2 100%);
+        border: 1px solid #fecaca;
+        transition: all 0.3s ease;
+    }
+    .integration-card:hover {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+}
